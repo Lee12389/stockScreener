@@ -8,7 +8,15 @@
 </head>
 <body>
     <main class="container">
-        <h1>{{ app_name }}</h1>
+        <header class="topbar">
+            <h1>{{ app_name }}</h1>
+            <nav>
+                <a href="/">Dashboard</a>
+                <a href="/watchlist">Watchlist</a>
+                <a href="/strategies">Strategies</a>
+            </nav>
+        </header>
+
         <p class="meta">Connection: {% if connected %}<span class="ok">Connected</span>{% else %}<span class="warn">Not Connected</span>{% endif %}</p>
         <p class="meta">Mode: <strong>{{ mode|upper }}</strong> | Live Enabled in Env: <strong>{{ allow_live }}</strong></p>
 

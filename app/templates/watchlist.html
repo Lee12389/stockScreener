@@ -1,0 +1,57 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ app_name }} - Watchlist</title>
+    <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+<main class="container">
+    <header class="topbar">
+        <h1>Watchlist</h1>
+        <nav>
+            <a href="/">Dashboard</a>
+            <a href="/watchlist" class="active">Watchlist</a>
+            <a href="/strategies">Strategies</a>
+        </nav>
+    </header>
+
+    <section class="card">
+        <h2>Add Symbol</h2>
+        <form action="/watchlist/add" method="post" class="inline-form">
+            <input name="symbol" placeholder="e.g. RELIANCE.NS" required />
+            <input name="sector" placeholder="Sector (optional)" value="Custom" />
+            <button type="submit">Add</button>
+        </form>
+        <form action="/watchlist/seed-defaults" method="post" class="mt8">
+            <button type="submit">Reload Sector Top-10 Defaults</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>Current Watchlist ({{ items|length }})</h2>
+        <table>
+            <thead>
+                <tr><th>Symbol</th><th>Sector</th><th>Source</th><th>Action</th></tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>{{ item.symbol }}</td>
+                    <td>{{ item.sector }}</td>
+                    <td>{{ item.source }}</td>
+                    <td>
+                        <form action="/watchlist/remove" method="post">
+                            <input type="hidden" name="symbol" value="{{ item.symbol }}" />
+                            <button type="submit" class="danger">Remove</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+</main>
+</body>
+</html>

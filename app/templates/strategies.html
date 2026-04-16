@@ -1,0 +1,48 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ app_name }} - Strategies</title>
+    <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+<main class="container">
+    <header class="topbar">
+        <h1>Strategies</h1>
+        <nav>
+            <a href="/">Dashboard</a>
+            <a href="/watchlist">Watchlist</a>
+            <a href="/strategies" class="active">Strategies</a>
+        </nav>
+    </header>
+
+    <section class="card">
+        <h2>RSA Flow (Implemented with RSI)</h2>
+        <p class="meta">Rules: Monthly RSI &gt; 60, Weekly RSI &gt; 60, and Daily RSI cross/bounce at 40 or 60.</p>
+        <p class="meta">Watchlist symbols scanned: <strong>{{ watchlist_count }}</strong></p>
+    </section>
+
+    <section class="card">
+        <h2>Strategy Matches ({{ hits|length }})</h2>
+        <table>
+            <thead>
+                <tr><th>Symbol</th><th>Monthly RSI</th><th>Weekly RSI</th><th>Daily RSI</th><th>Triggers</th><th>Note</th></tr>
+            </thead>
+            <tbody>
+                {% for h in hits %}
+                <tr>
+                    <td>{{ h.symbol }}</td>
+                    <td>{{ h.monthly_rsi }}</td>
+                    <td>{{ h.weekly_rsi }}</td>
+                    <td>{{ h.daily_rsi }}</td>
+                    <td>{{ ', '.join(h.triggers) }}</td>
+                    <td>{{ h.note }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+</main>
+</body>
+</html>

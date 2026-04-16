@@ -6,6 +6,7 @@
     --line: #d9dfdf;
     --good: #0f8a5f;
     --warn: #bf360c;
+    --danger: #a31621;
 }
 
 * { box-sizing: border-box; }
@@ -16,9 +17,25 @@ body {
     color: var(--text);
 }
 .container {
-    max-width: 980px;
+    max-width: 1120px;
     margin: 0 auto;
     padding: 24px;
+}
+.topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.topbar nav a {
+    color: #174d4f;
+    text-decoration: none;
+    margin-left: 12px;
+    font-weight: 600;
+}
+.topbar nav a.active {
+    text-decoration: underline;
 }
 h1 { margin-bottom: 6px; }
 .meta { color: var(--muted); }
@@ -42,6 +59,7 @@ th, td {
     border-bottom: 1px solid var(--line);
     padding: 8px;
     font-size: 14px;
+    vertical-align: top;
 }
 button {
     background: #174d4f;
@@ -51,12 +69,26 @@ button {
     padding: 8px 12px;
     cursor: pointer;
 }
-select {
+button.danger {
+    background: var(--danger);
+}
+select, input {
     padding: 8px;
     border-radius: 8px;
     border: 1px solid var(--line);
     margin-right: 8px;
 }
-.controls form {
+.controls form, .mt8 {
     margin-bottom: 10px;
+}
+.inline-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+@media (max-width: 768px) {
+    th, td {
+        font-size: 12px;
+    }
 }

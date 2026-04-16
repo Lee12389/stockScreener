@@ -1,0 +1,8 @@
+﻿# Local secrets/config (do not commit)
+.env
+defaults.yaml
+
+# Runtime artifacts
+autotrader.db
+__pycache__/
+*.pyc

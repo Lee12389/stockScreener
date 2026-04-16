@@ -64,3 +64,32 @@ Open: http://127.0.0.1:8000
 - Telegram/Slack alerts
 - advanced risk sizing and stop logic
 - auth + multi-user workspaces
+
+## Credential config
+
+You can save credentials either in `.env` or in `defaults.yaml`.
+Priority order is:
+1. environment variables
+2. `.env`
+3. `defaults.yaml`
+
+`defaults.yaml` is git-ignored for safety.
+
+## New Pages
+
+- `/watchlist`: add/remove symbols and reload sector defaults.
+- `/strategies`: scans watchlist for your RSA flow (implemented with RSI).
+
+## Strategy 1 (RSA Flow)
+
+Implemented condition:
+- Monthly RSI > 60
+- Weekly RSI > 60
+- Daily RSI cross above 40 or 60
+- Daily RSI bounce-back around 40/60 zones
+
+Note: rule name is shown as RSA in UI, calculated with RSI values.
+
+## Sector Top 10 Defaults
+
+On startup, app seeds watchlist with sector top-10 symbol sets (NIFTY sector starter universe). You can reload defaults from Watchlist page.

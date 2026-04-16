@@ -3,7 +3,7 @@
 from datetime import datetime
 from pathlib import Path
 
-from sqlalchemy import Boolean, DateTime, Float, Integer, String, create_engine
+from sqlalchemy import DateTime, Float, Integer, String, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 
@@ -42,6 +42,17 @@ class AnalysisSnapshot(Base):
     suggestion: Mapped[str] = mapped_column(String(8), nullable=False)
     confidence: Mapped[float] = mapped_column(Float, nullable=False)
     reason: Mapped[str] = mapped_column(String(500), nullable=False)
+
+
+class WatchlistItem(Base):
+    __tablename__ = 'watchlist_items'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    symbol: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
+    sector: Mapped[str] = mapped_column(String(64), nullable=False, default='Custom')
+    source: Mapped[str] = mapped_column(String(64), nullable=False, default='manual')
+    enabled: Mapped[str] = mapped_column(String(5), nullable=False, default='true')
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
 
 _db_path = Path(__file__).resolve().parents[1] / 'autotrader.db'
