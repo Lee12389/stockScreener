@@ -96,6 +96,63 @@ class PaperTrade(Base):
     balance_after: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
 
 
+class StrategyBot(Base):
+    __tablename__ = 'strategy_bots'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    strategy: Mapped[str] = mapped_column(String(64), nullable=False)
+    starting_capital: Mapped[float] = mapped_column(Float, nullable=False, default=1000000.0)
+    cash_balance: Mapped[float] = mapped_column(Float, nullable=False, default=1000000.0)
+    equity: Mapped[float] = mapped_column(Float, nullable=False, default=1000000.0)
+    realized_pnl: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    max_drawdown_pct: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    trades_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    wins_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    losses_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default='idle')
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class StrategyBotPosition(Base):
+    __tablename__ = 'strategy_bot_positions'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    bot_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    symbol: Mapped[str] = mapped_column(String(32), nullable=False)
+    instrument: Mapped[str] = mapped_column(String(16), nullable=False)  # EQ/FUT/OPT
+    side: Mapped[str] = mapped_column(String(8), nullable=False)  # BUY/SELL
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    entry_price: Mapped[float] = mapped_column(Float, nullable=False)
+    stop_loss: Mapped[float] = mapped_column(Float, nullable=False)
+    target_1: Mapped[float] = mapped_column(Float, nullable=False)
+    target_2: Mapped[float] = mapped_column(Float, nullable=False)
+    reserved_margin: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    signal_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    strategy_signal: Mapped[str] = mapped_column(String(64), nullable=False, default='NA')
+    opened_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class StrategyBotTrade(Base):
+    __tablename__ = 'strategy_bot_trades'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    bot_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    symbol: Mapped[str] = mapped_column(String(32), nullable=False)
+    instrument: Mapped[str] = mapped_column(String(16), nullable=False)
+    side: Mapped[str] = mapped_column(String(8), nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    entry_price: Mapped[float] = mapped_column(Float, nullable=False)
+    exit_price: Mapped[float] = mapped_column(Float, nullable=False)
+    pnl: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    win: Mapped[str] = mapped_column(String(5), nullable=False, default='false')
+    reason: Mapped[str] = mapped_column(String(128), nullable=False, default='signal_flip')
+    signal_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+
+
 _db_path = Path(__file__).resolve().parents[1] / 'autotrader.db'
 _engine = create_engine(f'sqlite:///{_db_path}', future=True)
 SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False, expire_on_commit=False)
@@ -104,6 +161,7 @@ SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False, exp
 def init_db() -> None:
     Base.metadata.create_all(_engine)
     _ensure_watchlist_schema()
+    _ensure_strategy_bot_schema()
     _ensure_paper_defaults()
 
 
@@ -152,3 +210,17 @@ def _ensure_paper_defaults() -> None:
                     "VALUES (1, 100000.0, 100000.0, 0.0, CURRENT_TIMESTAMP)"
                 )
             )
+
+
+def _ensure_strategy_bot_schema() -> None:
+    with _engine.begin() as conn:
+        cols = {
+            row[1]
+            for row in conn.execute(text("PRAGMA table_info(strategy_bot_positions)")).fetchall()
+        }
+        if not cols:
+            return
+        if 'reserved_margin' not in cols:
+            conn.execute(text("ALTER TABLE strategy_bot_positions ADD COLUMN reserved_margin FLOAT DEFAULT 0.0"))
+        if 'signal_score' not in cols:
+            conn.execute(text("ALTER TABLE strategy_bot_positions ADD COLUMN signal_score FLOAT DEFAULT 0.0"))

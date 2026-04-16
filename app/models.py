@@ -68,3 +68,16 @@ class PaperBotRequest(BaseModel):
 
 class PaperFundRequest(BaseModel):
     starting_cash: float = Field(default=100000.0, ge=1000.0)
+
+
+class TournamentInitRequest(BaseModel):
+    starting_capital: float = Field(default=1000000.0, ge=100000.0)
+
+
+class TournamentStartRequest(BaseModel):
+    interval_seconds: int = Field(default=60, ge=10, le=3600)
+    refresh_signals: bool = True
+
+
+class TournamentRunRequest(BaseModel):
+    refresh_signals: bool = True

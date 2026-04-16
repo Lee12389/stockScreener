@@ -1,0 +1,97 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ app_name }} - Tournament</title>
+    <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+<main class="container">
+    <header class="topbar">
+        <h1>Strategy Tournament (10 Bots)</h1>
+        <nav>
+            <a href="/">Dashboard</a>
+            <a href="/watchlist">Watchlist</a>
+            <a href="/strategies">Strategies</a>
+            <a href="/paper">Paper</a>
+            <a href="/tournament" class="active">Tournament</a>
+        </nav>
+    </header>
+
+    <section class="card">
+        <h2>Controls</h2>
+        <form action="/tournament/init" method="post" class="inline-form">
+            <input type="number" step="10000" name="starting_capital" value="1000000" />
+            <button type="submit">Initialize 10 Bots</button>
+        </form>
+        <form action="/tournament/run-once" method="post" class="inline-form mt8">
+            <select name="refresh_signals">
+                <option value="true">Refresh Signals</option>
+                <option value="false">Use Cache</option>
+            </select>
+            <button type="submit">Run Once</button>
+        </form>
+        <form action="/tournament/start" method="post" class="inline-form mt8">
+            <input type="number" name="interval_seconds" min="10" max="3600" value="60" />
+            <select name="refresh_signals">
+                <option value="true">Refresh each run</option>
+                <option value="false">Use cache</option>
+            </select>
+            <button type="submit">Start Auto Run</button>
+        </form>
+        <form action="/tournament/stop" method="post" class="mt8">
+            <button type="submit" class="danger">Stop Auto Run</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>Leaderboard</h2>
+        <table>
+            <thead>
+                <tr><th>Bot</th><th>Strategy</th><th>Equity</th><th>Return %</th><th>Realized PnL</th><th>Trades</th><th>Win %</th><th>Max DD %</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+            {% for b in board.bots %}
+            <tr>
+                <td>{{ b.name }}</td>
+                <td>{{ b.strategy }}</td>
+                <td>{{ b.equity }}</td>
+                <td class="{{ 'ok' if b.return_pct >= 0 else 'warn' }}">{{ b.return_pct }}</td>
+                <td class="{{ 'ok' if b.realized_pnl >= 0 else 'warn' }}">{{ b.realized_pnl }}</td>
+                <td>{{ b.trades_count }}</td>
+                <td>{{ b.win_rate_pct }}</td>
+                <td>{{ b.max_drawdown_pct }}</td>
+                <td>{{ b.status }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="card">
+        <h2>Recent Tournament Trades</h2>
+        <table>
+            <thead><tr><th>Time</th><th>Bot</th><th>Symbol</th><th>Inst</th><th>Side</th><th>Qty</th><th>Entry</th><th>Exit</th><th>PnL</th><th>Reason</th><th>Score</th></tr></thead>
+            <tbody>
+            {% for t in board.recent_trades %}
+            <tr>
+                <td>{{ t.time }}</td>
+                <td>{{ t.bot_id }}</td>
+                <td>{{ t.symbol }}</td>
+                <td>{{ t.instrument }}</td>
+                <td>{{ t.side }}</td>
+                <td>{{ t.qty }}</td>
+                <td>{{ t.entry }}</td>
+                <td>{{ t.exit }}</td>
+                <td class="{{ 'ok' if t.pnl >= 0 else 'warn' }}">{{ t.pnl }}</td>
+                <td>{{ t.reason }}</td>
+                <td>{{ t.signal_score }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+</main>
+</body>
+</html>

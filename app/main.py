@@ -13,12 +13,16 @@ from app.models import (
     PaperFundRequest,
     PaperTradeRequest,
     SessionStatus,
+    TournamentInitRequest,
+    TournamentRunRequest,
+    TournamentStartRequest,
     TradeRequest,
 )
 from app.services.analysis import AnalysisService
 from app.services.angel_client import AngelClient
 from app.services.automation import AutomationService
 from app.services.strategy import StrategyService
+from app.services.strategy_tournament import StrategyTournamentService
 from app.services.trade_engine import TradeEngine
 from app.services.watchlist import WatchlistService
 from app.services.paper_trader import PaperTraderService
@@ -37,6 +41,7 @@ automation_service = AutomationService(analysis_service, trade_engine)
 watchlist_service = WatchlistService()
 strategy_service = StrategyService(angel_client, watchlist_service)
 paper_trader = PaperTraderService(strategy_service)
+tournament_service = StrategyTournamentService(strategy_service)
 
 
 @app.on_event('startup')
@@ -142,6 +147,34 @@ def api_paper_auto_start(req: PaperBotRequest) -> dict:
 def api_paper_auto_stop() -> dict:
     paper_trader.stop_auto()
     return {'ok': True, 'message': 'Paper auto-trader stopped.'}
+
+
+@app.post('/api/tournament/init')
+def api_tournament_init(req: TournamentInitRequest) -> dict:
+    board = tournament_service.setup_bots(capital=req.starting_capital)
+    return {'ok': True, 'leaderboard': board}
+
+
+@app.post('/api/tournament/start')
+def api_tournament_start(req: TournamentStartRequest) -> dict:
+    tournament_service.start(interval_seconds=req.interval_seconds, refresh_signals=req.refresh_signals)
+    return {'ok': True, 'message': 'Tournament auto-run started.'}
+
+
+@app.post('/api/tournament/stop')
+def api_tournament_stop() -> dict:
+    tournament_service.stop()
+    return {'ok': True, 'message': 'Tournament auto-run stopped.'}
+
+
+@app.post('/api/tournament/run-once')
+def api_tournament_run_once(req: TournamentRunRequest) -> dict:
+    return tournament_service.run_once(refresh_signals=req.refresh_signals)
+
+
+@app.get('/api/tournament/leaderboard')
+def api_tournament_leaderboard() -> dict:
+    return tournament_service.leaderboard()
 
 
 @app.get('/api/watchlist')
@@ -255,6 +288,16 @@ def paper_page(request: Request):
     )
 
 
+@app.get('/tournament', response_class=HTMLResponse)
+def tournament_page(request: Request):
+    board = tournament_service.leaderboard()
+    return templates.TemplateResponse(
+        request=request,
+        name='tournament.html',
+        context={'app_name': settings.app_name, 'board': board},
+    )
+
+
 @app.post('/paper/fund')
 def paper_fund(starting_cash: float = Form(...)):
     paper_trader.reset_account(starting_cash)
@@ -299,6 +342,30 @@ def paper_auto_start(
 def paper_auto_stop():
     paper_trader.stop_auto()
     return RedirectResponse('/paper', status_code=303)
+
+
+@app.post('/tournament/init')
+def tournament_init(starting_capital: float = Form(...)):
+    tournament_service.setup_bots(capital=starting_capital)
+    return RedirectResponse('/tournament', status_code=303)
+
+
+@app.post('/tournament/run-once')
+def tournament_run_once(refresh_signals: bool = Form(True)):
+    tournament_service.run_once(refresh_signals=refresh_signals)
+    return RedirectResponse('/tournament', status_code=303)
+
+
+@app.post('/tournament/start')
+def tournament_start(interval_seconds: int = Form(60), refresh_signals: bool = Form(True)):
+    tournament_service.start(interval_seconds=interval_seconds, refresh_signals=refresh_signals)
+    return RedirectResponse('/tournament', status_code=303)
+
+
+@app.post('/tournament/stop')
+def tournament_stop():
+    tournament_service.stop()
+    return RedirectResponse('/tournament', status_code=303)
 
 
 @app.post('/watchlist/add')

@@ -45,6 +45,7 @@ bash ./scripts/run_linux.sh
 - `/watchlist` watchlist management
 - `/strategies` RSI / Supertrend / merged signals
 - `/paper` paper trading account, manual and automated paper execution
+- `/tournament` 10-strategy bot tournament (each bot starts with configurable capital)
 
 ## Key APIs
 
@@ -54,6 +55,11 @@ bash ./scripts/run_linux.sh
 - `POST /api/paper/auto/start`
 - `POST /api/paper/auto/stop`
 - `GET /api/paper/summary`
+- `POST /api/tournament/init`
+- `POST /api/tournament/run-once`
+- `POST /api/tournament/start`
+- `POST /api/tournament/stop`
+- `GET /api/tournament/leaderboard`
 
 ## Notes
 

@@ -81,6 +81,8 @@ class StrategyService:
             prev_daily = row['prev_daily_rsi']
             if monthly <= 60 or weekly <= 60:
                 continue
+            if not (row['close'] >= row['ema50'] and daily >= 50):
+                continue
 
             tail10 = row['daily_rsi_tail10']
             tail20 = row['daily_rsi_tail20']
@@ -118,13 +120,24 @@ class StrategyService:
                     stop_loss=round(row['previous_day_low'], 2),
                     targets=targets,
                     action='BUY',
-                    note='Monthly/Weekly strength confirmed; SL is previous day low.',
+                    note=f"Trend confirmed (price>EMA50, RSI14>=50). VolWeight={row['volume_weight']:.2f}, SR-Prox={row['sr_proximity']:.2f}",
                     sparkline=row['sparkline'],
                 )
             )
 
-        hits.sort(key=lambda x: (len(x.triggers), x.change_pct, x.daily_rsi), reverse=True)
+        hits.sort(
+            key=lambda x: (
+                len(x.triggers),
+                market.get(x.symbol, {}).get('volume_weight', 1.0) * market.get(x.symbol, {}).get('sr_proximity', 0.0),
+                x.change_pct,
+                x.daily_rsi,
+            ),
+            reverse=True,
+        )
         return hits, None
+
+    def get_market_snapshot(self, force_refresh: bool = False) -> tuple[dict[str, dict], str | None]:
+        return self._load_market_data(force_refresh=force_refresh)
 
     def scan_supertrend(self, force_refresh: bool = False) -> tuple[list[SupertrendHit], str | None]:
         market, error = self._load_market_data(force_refresh=force_refresh)
@@ -134,6 +147,10 @@ class StrategyService:
         hits: list[SupertrendHit] = []
         for symbol, row in market.items():
             signal = row['super_signal']
+            if 'BUY' in signal and row['close'] < row['ema50']:
+                signal = 'HOLD'
+            if 'SELL' in signal and row['close'] > row['ema50']:
+                signal = 'HOLD'
             if signal == 'HOLD':
                 continue
             hits.append(
@@ -148,7 +165,7 @@ class StrategyService:
                     resistance=round(row['resistance'], 2),
                     supertrend=round(row['supertrend_value'], 2),
                     signal=signal,
-                    note='Supertrend + recent 20-candle support/resistance levels.',
+                    note=f"Supertrend + S/R + Trend filter (EMA50). VolWeight={row['volume_weight']:.2f}, SR-Prox={row['sr_proximity']:.2f}",
                     sparkline=row['sparkline'],
                 )
             )
@@ -247,6 +264,7 @@ class StrategyService:
             highs = [float(c['high']) for c in candles]
             lows = [float(c['low']) for c in candles]
             closes = [float(c['close']) for c in candles]
+            volumes = [float(c.get('volume', 0.0)) for c in candles]
 
             if len(closes) < 120:
                 continue
@@ -261,6 +279,14 @@ class StrategyService:
             support = min(lows[-20:])
             resistance = max(highs[-20:])
             close_now = closes[-1]
+            ema50 = _ema(closes, 50)[-1]
+            ema20 = _ema(closes, 20)[-1]
+            trend = 'UP' if close_now >= ema50 else 'DOWN'
+            vol_ma20 = (sum(volumes[-20:]) / max(len(volumes[-20:]), 1)) if volumes else 0.0
+            volume_ratio = (volumes[-1] / vol_ma20) if vol_ma20 > 0 else 1.0
+            sr_nearest = min(abs(close_now - support), abs(resistance - close_now))
+            sr_proximity = max(0.0, 1.0 - (sr_nearest / max(close_now * 0.02, 0.01)))
+            volume_weight = max(0.5, min(2.0, volume_ratio))
 
             if is_bullish and close_now >= resistance * 0.998:
                 super_signal = 'STRONG_BUY'
@@ -294,6 +320,12 @@ class StrategyService:
                 'supertrend_value': supertrend_vals[-1],
                 'super_signal': super_signal,
                 'close': close_now,
+                'ema20': ema20,
+                'ema50': ema50,
+                'trend': trend,
+                'volume_ratio': volume_ratio,
+                'volume_weight': volume_weight,
+                'sr_proximity': sr_proximity,
                 'sparkline': _sparkline_points(closes[-40:]),
             }
 
@@ -328,6 +360,16 @@ def _rsi_series(closes: list[float], period: int = 14) -> list[float]:
     while len(rsi_values) < len(closes):
         rsi_values.insert(0, 50.0)
     return rsi_values[-len(closes):]
+
+
+def _ema(values: list[float], period: int) -> list[float]:
+    if not values:
+        return []
+    alpha = 2.0 / (period + 1)
+    out = [values[0]]
+    for v in values[1:]:
+        out.append((v * alpha) + (out[-1] * (1 - alpha)))
+    return out
 
 
 def _supertrend(highs: list[float], lows: list[float], closes: list[float], period: int = 10, multiplier: float = 3.0):
