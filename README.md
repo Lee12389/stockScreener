@@ -80,16 +80,18 @@ Priority order is:
 - `/watchlist`: add/remove symbols and reload sector defaults.
 - `/strategies`: scans watchlist for your RSA flow (implemented with RSI).
 
-## Strategy 1 (RSA Flow)
-
-Implemented condition:
-- Monthly RSI > 60
-- Weekly RSI > 60
-- Daily RSI cross above 40 or 60
-- Daily RSI bounce-back around 40/60 zones
-
-Note: rule name is shown as RSA in UI, calculated with RSI values.
-
-## Sector Top 10 Defaults
+## Strategy 1 (RSA Flow)`r`n`r`nImplemented condition:`r`n- Monthly RSI > 60`r`n- Weekly RSI > 60`r`n- Daily RSI cross above 40 or 60`r`n- Daily RSI bounce-back around 40/60 zones`r`n`r`nData source: Angel One SmartAPI candles only for strategy scanning (no public market feed fallback).`r`n`r`n## Sector Top 10 Defaults
 
 On startup, app seeds watchlist with sector top-10 symbol sets (NIFTY sector starter universe). You can reload defaults from Watchlist page.
+
+
+## Filters on strategies page
+- Sector
+- Trigger type
+- Minimum daily percent change
+- Minimum daily RSI
+- Result limit
+
+Includes lightweight inline sparkline charts per symbol for quick visual trend checks.
+Strategy scan results are cached for 5 minutes by default (optional force refresh from UI/API).
+

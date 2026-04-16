@@ -20,7 +20,9 @@
     <section class="card">
         <h2>Add Symbol</h2>
         <form action="/watchlist/add" method="post" class="inline-form">
-            <input name="symbol" placeholder="e.g. RELIANCE.NS" required />
+            <input name="symbol" placeholder="e.g. RELIANCE-EQ" required />
+            <input name="exchange" placeholder="Exchange" value="NSE" />
+            <input name="symbol_token" placeholder="Token (optional)" />
             <input name="sector" placeholder="Sector (optional)" value="Custom" />
             <button type="submit">Add</button>
         </form>
@@ -33,14 +35,23 @@
         <h2>Current Watchlist ({{ items|length }})</h2>
         <table>
             <thead>
-                <tr><th>Symbol</th><th>Sector</th><th>Source</th><th>Action</th></tr>
+                <tr><th>Symbol</th><th>Exchange</th><th>Token</th><th>Sector</th><th>Source</th><th>Enabled</th><th>Action</th></tr>
             </thead>
             <tbody>
                 {% for item in items %}
                 <tr>
                     <td>{{ item.symbol }}</td>
+                    <td>{{ item.exchange }}</td>
+                    <td>{{ item.symbol_token or '-' }}</td>
                     <td>{{ item.sector }}</td>
                     <td>{{ item.source }}</td>
+                    <td>
+                        <form action="/watchlist/toggle" method="post" class="inline-form">
+                            <input type="hidden" name="symbol" value="{{ item.symbol }}" />
+                            <input type="hidden" name="enabled" value="{{ 'false' if item.enabled == 'true' else 'true' }}" />
+                            <button type="submit">{{ 'Disable' if item.enabled == 'true' else 'Enable' }}</button>
+                        </form>
+                    </td>
                     <td>
                         <form action="/watchlist/remove" method="post">
                             <input type="hidden" name="symbol" value="{{ item.symbol }}" />

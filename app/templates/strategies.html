@@ -18,25 +18,72 @@
     </header>
 
     <section class="card">
-        <h2>RSA Flow (Implemented with RSI)</h2>
+        <h2>RSA Flow (Angel Candle Data)</h2>
         <p class="meta">Rules: Monthly RSI &gt; 60, Weekly RSI &gt; 60, and Daily RSI cross/bounce at 40 or 60.</p>
-        <p class="meta">Watchlist symbols scanned: <strong>{{ watchlist_count }}</strong></p>
+        <p class="meta">Watchlist symbols scanned: <strong>{{ watchlist_count }}</strong> | Raw hits: <strong>{{ all_hits_count }}</strong> | Showing: <strong>{{ hits|length }}</strong></p>
+        {% if error %}<p class="warn">{{ error }}</p>{% endif %}
     </section>
 
     <section class="card">
-        <h2>Strategy Matches ({{ hits|length }})</h2>
+        <h2>Filters</h2>
+        <form method="get" action="/strategies" class="inline-form">
+            <label>Sector
+                <select name="sector">
+                    <option value="all" {% if filters.sector == 'all' %}selected{% endif %}>All</option>
+                    {% for s in sectors %}
+                    <option value="{{ s }}" {% if filters.sector == s %}selected{% endif %}>{{ s }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>Trigger
+                <select name="trigger">
+                    <option value="all" {% if filters.trigger == 'all' %}selected{% endif %}>All</option>
+                    <option value="cross_above_40" {% if filters.trigger == 'cross_above_40' %}selected{% endif %}>Cross Above 40</option>
+                    <option value="cross_above_60" {% if filters.trigger == 'cross_above_60' %}selected{% endif %}>Cross Above 60</option>
+                    <option value="bounce_from_40_zone" {% if filters.trigger == 'bounce_from_40_zone' %}selected{% endif %}>Bounce 40 Zone</option>
+                    <option value="bounce_from_60_zone" {% if filters.trigger == 'bounce_from_60_zone' %}selected{% endif %}>Bounce 60 Zone</option>
+                </select>
+            </label>
+            <label>Min % Change
+                <input type="number" step="0.1" name="min_change_pct" value="{{ filters.min_change_pct }}" />
+            </label>
+            <label>Min Daily RSI
+                <input type="number" step="0.1" name="min_daily_rsi" value="{{ filters.min_daily_rsi }}" />
+            </label>
+            <label>Limit
+                <input type="number" min="1" max="500" name="limit" value="{{ filters.limit }}" />
+            </label>
+            <label>Refresh
+                <select name="refresh">
+                    <option value="false" {% if not filters.refresh %}selected{% endif %}>Use Cache</option>
+                    <option value="true" {% if filters.refresh %}selected{% endif %}>Force Fresh Scan</option>
+                </select>
+            </label>
+            <button type="submit">Apply</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>Strategy Matches</h2>
         <table>
             <thead>
-                <tr><th>Symbol</th><th>Monthly RSI</th><th>Weekly RSI</th><th>Daily RSI</th><th>Triggers</th><th>Note</th></tr>
+                <tr><th>Symbol</th><th>Sector</th><th>% Change</th><th>Monthly RSI</th><th>Weekly RSI</th><th>Daily RSI</th><th>Triggers</th><th>Trend</th><th>Note</th></tr>
             </thead>
             <tbody>
                 {% for h in hits %}
                 <tr>
                     <td>{{ h.symbol }}</td>
+                    <td>{{ h.sector }}</td>
+                    <td class="{{ 'ok' if h.change_pct >= 0 else 'warn' }}">{{ h.change_pct }}%</td>
                     <td>{{ h.monthly_rsi }}</td>
                     <td>{{ h.weekly_rsi }}</td>
                     <td>{{ h.daily_rsi }}</td>
                     <td>{{ ', '.join(h.triggers) }}</td>
+                    <td>
+                        <svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none" role="img" aria-label="Price trend">
+                            <polyline points="{{ h.sparkline }}" fill="none" stroke="#1f6f78" stroke-width="1.5" />
+                        </svg>
+                    </td>
                     <td>{{ h.note }}</td>
                 </tr>
                 {% endfor %}

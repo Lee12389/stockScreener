@@ -78,6 +78,20 @@ select, input {
     border: 1px solid var(--line);
     margin-right: 8px;
 }
+.inline-form label {
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.spark {
+    width: 120px;
+    height: 30px;
+    display: block;
+    background: linear-gradient(180deg, #f6faf9 0%, #ffffff 100%);
+    border-radius: 4px;
+}
 .controls form, .mt8 {
     margin-bottom: 10px;
 }

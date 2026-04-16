@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 
+from datetime import datetime, timedelta
 from typing import Any
 
 import pyotp
@@ -54,6 +55,11 @@ class AngelClient:
             self.last_error = str(exc)
             return False, self.last_error
 
+    def ensure_connected(self) -> tuple[bool, str]:
+        if self.is_connected():
+            return True, 'already connected'
+        return self.connect()
+
     def is_connected(self) -> bool:
         return self.connected and self.client is not None
 
@@ -65,8 +71,65 @@ class AngelClient:
             raise AttributeError(f'Method {method_name} not available in current SmartAPI SDK.')
         return method(*args, **kwargs)
 
+    def resolve_symbol_token(self, exchange: str, symbol: str) -> tuple[str | None, str | None]:
+        ex = exchange.strip().upper() or 'NSE'
+        candidates = self._search_candidates(symbol)
+
+        for query in candidates:
+            try:
+                result = self._safe_call('searchScrip', ex, query)
+                rows = result.get('data') or []
+            except Exception:
+                continue
+
+            symbol_u = symbol.strip().upper()
+            for row in rows:
+                t_symbol = (row.get('tradingsymbol') or '').upper().strip()
+                if t_symbol == symbol_u:
+                    return str(row.get('symboltoken') or ''), row.get('tradingsymbol')
+
+            if rows:
+                first = rows[0]
+                return str(first.get('symboltoken') or ''), (first.get('tradingsymbol') or symbol)
+
+        return None, None
+
+    def fetch_candles(
+        self,
+        exchange: str,
+        tradingsymbol: str,
+        symboltoken: str,
+        days: int = 730,
+    ) -> list[dict[str, float | str]]:
+        to_dt = datetime.now()
+        from_dt = to_dt - timedelta(days=days)
+        params = {
+            'exchange': exchange,
+            'tradingsymbol': tradingsymbol,
+            'symboltoken': symboltoken,
+            'interval': 'ONE_DAY',
+            'fromdate': from_dt.strftime('%Y-%m-%d %H:%M'),
+            'todate': to_dt.strftime('%Y-%m-%d %H:%M'),
+        }
+        data = self._safe_call('getCandleData', params)
+        rows = data.get('data') or []
+        candles = []
+        for row in rows:
+            if not isinstance(row, list) or len(row) < 6:
+                continue
+            candles.append(
+                {
+                    'ts': str(row[0]),
+                    'open': _as_float(row[1]) or 0.0,
+                    'high': _as_float(row[2]) or 0.0,
+                    'low': _as_float(row[3]) or 0.0,
+                    'close': _as_float(row[4]) or 0.0,
+                    'volume': _as_float(row[5]) or 0.0,
+                }
+            )
+        return candles
+
     def fetch_top_performers(self, top_n: int, watchlist_symbols: list[str]) -> list[dict[str, Any]]:
-        # 1) Preferred path: if SDK supports gainersLosers endpoint.
         try:
             data = self._safe_call('gainersLosers', {'datatype': 'PercOIGainers'})
             rows = data.get('data') or []
@@ -83,16 +146,19 @@ class AngelClient:
         except Exception:
             pass
 
-        # 2) Fallback path: compute ranking from watchlist quotes if LTP endpoint is available.
         ranked: list[dict[str, Any]] = []
         for symbol in watchlist_symbols:
+            token, resolved_symbol = self.resolve_symbol_token('NSE', symbol)
+            if not token:
+                continue
+            symbol_for_quote = resolved_symbol or symbol
             try:
-                quote = self._safe_call('ltpData', 'NSE', symbol, '')
+                quote = self._safe_call('ltpData', 'NSE', symbol_for_quote, token)
                 data = quote.get('data') or {}
                 change_pct = _as_float(data.get('percentChange') or data.get('pChange'))
                 ranked.append(
                     {
-                        'symbol': symbol,
+                        'symbol': symbol_for_quote,
                         'last_price': _as_float(data.get('ltp')),
                         'change_pct': change_pct,
                     }
@@ -103,12 +169,26 @@ class AngelClient:
         ranked.sort(key=lambda x: (x['change_pct'] if x['change_pct'] is not None else -9999), reverse=True)
         return ranked[:top_n]
 
-    def place_order(self, order_params: dict[str, Any]) -> dict[str, Any]:
-        try:
-            order_id = self._safe_call('placeOrder', order_params)
-            return {'ok': True, 'order_id': str(order_id), 'raw': order_id}
-        except Exception as exc:
-            return {'ok': False, 'error': str(exc)}
+    @staticmethod
+    def _search_candidates(symbol: str) -> list[str]:
+        s = symbol.strip().upper()
+        cands: list[str] = []
+        if s:
+            cands.append(s)
+        if s.endswith('-EQ'):
+            cands.append(s[:-3])
+        if s.endswith('.NS'):
+            cands.append(s.replace('.NS', ''))
+            cands.append(s.replace('.NS', '-EQ'))
+        if '-' not in s and not s.endswith('.NS'):
+            cands.append(f'{s}-EQ')
+        dedup = []
+        seen = set()
+        for c in cands:
+            if c and c not in seen:
+                dedup.append(c)
+                seen.add(c)
+        return dedup
 
 
 def _as_float(value: Any) -> float | None:

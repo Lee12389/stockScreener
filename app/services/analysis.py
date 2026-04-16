@@ -10,9 +10,12 @@ class AnalysisService:
         self.settings = get_settings()
 
     def top_performers(self) -> list[Performer]:
+        return self.top_performers_from_symbols(self.settings.watchlist_symbols)
+
+    def top_performers_from_symbols(self, symbols: list[str]) -> list[Performer]:
         rows = self.angel_client.fetch_top_performers(
             top_n=self.settings.top_n,
-            watchlist_symbols=self.settings.watchlist_symbols,
+            watchlist_symbols=symbols,
         )
         return [
             Performer(
