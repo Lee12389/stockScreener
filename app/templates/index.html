@@ -19,6 +19,8 @@
 
         <p class="meta">Connection: {% if connected %}<span class="ok">Connected</span>{% else %}<span class="warn">Not Connected</span>{% endif %}</p>
         <p class="meta">Mode: <strong>{{ mode|upper }}</strong> | Live Enabled in Env: <strong>{{ allow_live }}</strong></p>
+        <p class="meta">{{ info_message }}</p>
+        <p><a href="/?refresh=true"><button type="button">Refresh Dashboard</button></a></p>
 
         <section class="card">
             <h2>Top Performers</h2>

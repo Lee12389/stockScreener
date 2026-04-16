@@ -22,6 +22,7 @@
         <p class="meta">Rules: Monthly RSI &gt; 60, Weekly RSI &gt; 60, and Daily RSI cross/bounce at 40 or 60.</p>
         <p class="meta">Watchlist symbols scanned: <strong>{{ watchlist_count }}</strong> | Raw hits: <strong>{{ all_hits_count }}</strong> | Showing: <strong>{{ hits|length }}</strong></p>
         {% if error %}<p class="warn">{{ error }}</p>{% endif %}
+        <p><a href="/strategies?refresh=true"><button type="button">Run Fresh Scan</button></a></p>
     </section>
 
     <section class="card">

@@ -147,13 +147,20 @@ def api_strategy_scan(
 
 
 @app.get('/', response_class=HTMLResponse)
-def dashboard(request: Request):
-    if not angel_client.is_connected():
-        angel_client.connect()
-
-    watch_symbols = [row.symbol for row in watchlist_service.enabled_items()]
-    performers = analysis_service.top_performers_from_symbols(watch_symbols)
-    bundle = analysis_service.suggestions(performers)
+def dashboard(request: Request, refresh: bool = Query(default=False)):
+    performers = []
+    suggestions = []
+    info_message = 'Data not refreshed yet. Click Refresh Dashboard to fetch latest broker data.'
+    if refresh:
+        ok, msg = angel_client.ensure_connected()
+        if ok:
+            watch_symbols = [row.symbol for row in watchlist_service.enabled_items()]
+            performers = analysis_service.top_performers_from_symbols(watch_symbols)
+            bundle = analysis_service.suggestions(performers)
+            suggestions = bundle.suggestions
+            info_message = f'Dashboard refreshed for {len(watch_symbols)} symbols.'
+        else:
+            info_message = f'Unable to refresh dashboard: {msg}'
 
     with SessionLocal() as session:
         mode = get_state(session, 'trade_mode', settings.default_mode)
@@ -166,8 +173,9 @@ def dashboard(request: Request):
             'connected': angel_client.is_connected(),
             'mode': mode,
             'performers': performers,
-            'suggestions': bundle.suggestions,
+            'suggestions': suggestions,
             'allow_live': settings.allow_live_trades,
+            'info_message': info_message,
         },
     )
 

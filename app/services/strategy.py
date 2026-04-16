@@ -29,8 +29,11 @@ class StrategyService:
         self.cache_ttl = timedelta(minutes=5)
 
     def scan_rsa_flow(self, force_refresh: bool = False) -> tuple[list[StrategyHit], str | None]:
-        if not force_refresh and self._cache_at and datetime.utcnow() - self._cache_at < self.cache_ttl:
-            return self._cache_hits, self._cache_error
+        if not force_refresh:
+            if self._cache_at and datetime.utcnow() - self._cache_at < self.cache_ttl:
+                return self._cache_hits, self._cache_error
+            if self._cache_at is None:
+                return [], 'No cached scan yet. Use force refresh to run the first scan.'
 
         ok, msg = self.angel_client.ensure_connected()
         if not ok:
