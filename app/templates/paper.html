@@ -1,0 +1,118 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ app_name }} - Paper Trading</title>
+    <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+<main class="container">
+    <header class="topbar">
+        <h1>Paper Trading</h1>
+        <nav>
+            <a href="/">Dashboard</a>
+            <a href="/watchlist">Watchlist</a>
+            <a href="/strategies">Strategies</a>
+            <a href="/paper" class="active">Paper</a>
+        </nav>
+    </header>
+
+    <section class="card">
+        <h2>Account</h2>
+        <p class="meta">Starting: <strong>{{ summary.starting_cash }}</strong> | Cash: <strong>{{ summary.cash_balance }}</strong> | Equity: <strong>{{ summary.equity }}</strong></p>
+        <p class="meta">Realized PnL: <strong>{{ summary.realized_pnl }}</strong> | Total PnL: <strong>{{ summary.total_pnl }}</strong></p>
+        <form action="/paper/fund" method="post" class="inline-form">
+            <input type="number" step="100" name="starting_cash" value="{{ summary.starting_cash }}" />
+            <button type="submit">Reset Paper Capital</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>Manual Paper Trade</h2>
+        <form action="/paper/manual" method="post" class="inline-form">
+            <input name="symbol" placeholder="e.g. RELIANCE-EQ" required />
+            <select name="strategy">
+                <option value="merged">merged</option>
+                <option value="rsi">rsi</option>
+                <option value="supertrend">supertrend</option>
+            </select>
+            <select name="action">
+                <option value="AUTO">AUTO</option>
+                <option value="BUY">BUY</option>
+                <option value="SELL">SELL</option>
+            </select>
+            <input type="number" step="100" name="amount" placeholder="Amount (optional)" value="0" />
+            <select name="refresh_signals">
+                <option value="false">Use cache</option>
+                <option value="true">Refresh signals</option>
+            </select>
+            <button type="submit">Run Paper Trade</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>Automated Paper Trader</h2>
+        <form action="/paper/auto/start" method="post" class="inline-form">
+            <select name="strategy">
+                <option value="merged">merged</option>
+                <option value="rsi">rsi</option>
+                <option value="supertrend">supertrend</option>
+            </select>
+            <input type="number" name="interval_minutes" min="1" max="240" value="15" />
+            <input type="number" name="max_trades_per_cycle" min="1" max="20" value="3" />
+            <select name="refresh_signals">
+                <option value="true">Refresh each cycle</option>
+                <option value="false">Use cache</option>
+            </select>
+            <button type="submit">Start Auto Paper</button>
+        </form>
+        <form action="/paper/auto/stop" method="post" class="mt8">
+            <button type="submit" class="danger">Stop Auto Paper</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>Open Positions ({{ summary.positions|length }})</h2>
+        <table>
+            <thead><tr><th>Symbol</th><th>Qty</th><th>Avg</th><th>LTP</th><th>Unrealized PnL</th><th>Strategy</th></tr></thead>
+            <tbody>
+            {% for p in summary.positions %}
+            <tr>
+                <td>{{ p.symbol }}</td>
+                <td>{{ p.quantity }}</td>
+                <td>{{ p.avg_price }}</td>
+                <td>{{ p.ltp }}</td>
+                <td class="{{ 'ok' if p.unrealized_pnl >= 0 else 'warn' }}">{{ p.unrealized_pnl }}</td>
+                <td>{{ p.strategy }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="card">
+        <h2>Recent Trades ({{ summary.trades|length }})</h2>
+        <table>
+            <thead><tr><th>Time</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Price</th><th>Value</th><th>Realized PnL</th><th>Signal</th><th>Note</th><th>Balance</th></tr></thead>
+            <tbody>
+            {% for t in summary.trades %}
+            <tr>
+                <td>{{ t.time }}</td>
+                <td>{{ t.symbol }}</td>
+                <td>{{ t.side }}</td>
+                <td>{{ t.quantity }}</td>
+                <td>{{ t.price }}</td>
+                <td>{{ t.value }}</td>
+                <td class="{{ 'ok' if t.realized_pnl >= 0 else 'warn' }}">{{ t.realized_pnl }}</td>
+                <td>{{ t.signal }}</td>
+                <td>{{ t.note }}</td>
+                <td>{{ t.balance_after }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+</main>
+</body>
+</html>

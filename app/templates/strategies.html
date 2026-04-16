@@ -14,20 +14,28 @@
             <a href="/">Dashboard</a>
             <a href="/watchlist">Watchlist</a>
             <a href="/strategies" class="active">Strategies</a>
+            <a href="/paper">Paper</a>
         </nav>
     </header>
 
     <section class="card">
-        <h2>RSA Flow (Angel Candle Data)</h2>
-        <p class="meta">Rules: Monthly RSI &gt; 60, Weekly RSI &gt; 60, and Daily RSI cross/bounce at 40 or 60.</p>
+        <h2>Strategy Engine (Angel Candle Data)</h2>
+        <p class="meta">RSI plan includes SL at previous day low with dynamic RSI targets. Supertrend includes support/resistance and buy/sell strength.</p>
         <p class="meta">Watchlist symbols scanned: <strong>{{ watchlist_count }}</strong> | Raw hits: <strong>{{ all_hits_count }}</strong> | Showing: <strong>{{ hits|length }}</strong></p>
         {% if error %}<p class="warn">{{ error }}</p>{% endif %}
-        <p><a href="/strategies?refresh=true"><button type="button">Run Fresh Scan</button></a></p>
+        <p><a href="/strategies?strategy={{ filters.strategy }}&refresh=true"><button type="button">Run Fresh Scan</button></a></p>
     </section>
 
     <section class="card">
         <h2>Filters</h2>
         <form method="get" action="/strategies" class="inline-form">
+            <label>Strategy
+                <select name="strategy">
+                    <option value="rsi" {% if filters.strategy == 'rsi' %}selected{% endif %}>RSI</option>
+                    <option value="supertrend" {% if filters.strategy == 'supertrend' %}selected{% endif %}>Supertrend</option>
+                    <option value="merged" {% if filters.strategy == 'merged' %}selected{% endif %}>Merge Both</option>
+                </select>
+            </label>
             <label>Sector
                 <select name="sector">
                     <option value="all" {% if filters.sector == 'all' %}selected{% endif %}>All</option>
@@ -43,6 +51,15 @@
                     <option value="cross_above_60" {% if filters.trigger == 'cross_above_60' %}selected{% endif %}>Cross Above 60</option>
                     <option value="bounce_from_40_zone" {% if filters.trigger == 'bounce_from_40_zone' %}selected{% endif %}>Bounce 40 Zone</option>
                     <option value="bounce_from_60_zone" {% if filters.trigger == 'bounce_from_60_zone' %}selected{% endif %}>Bounce 60 Zone</option>
+                </select>
+            </label>
+            <label>Signal
+                <select name="signal">
+                    <option value="all" {% if filters.signal == 'all' %}selected{% endif %}>All</option>
+                    <option value="BUY" {% if filters.signal == 'BUY' %}selected{% endif %}>BUY</option>
+                    <option value="STRONG_BUY" {% if filters.signal == 'STRONG_BUY' %}selected{% endif %}>STRONG_BUY</option>
+                    <option value="SELL" {% if filters.signal == 'SELL' %}selected{% endif %}>SELL</option>
+                    <option value="STRONG_SELL" {% if filters.signal == 'STRONG_SELL' %}selected{% endif %}>STRONG_SELL</option>
                 </select>
             </label>
             <label>Min % Change
@@ -68,7 +85,7 @@
         <h2>Strategy Matches</h2>
         <table>
             <thead>
-                <tr><th>Symbol</th><th>Sector</th><th>% Change</th><th>Monthly RSI</th><th>Weekly RSI</th><th>Daily RSI</th><th>Triggers</th><th>Trend</th><th>Note</th></tr>
+                <tr><th>Symbol</th><th>Sector</th><th>% Change</th><th>M RSI</th><th>W RSI</th><th>D RSI</th><th>SL</th><th>Targets</th><th>Support</th><th>Resistance</th><th>Signal</th><th>Triggers</th><th>Trend</th><th>Note</th></tr>
             </thead>
             <tbody>
                 {% for h in hits %}
@@ -76,10 +93,15 @@
                     <td>{{ h.symbol }}</td>
                     <td>{{ h.sector }}</td>
                     <td class="{{ 'ok' if h.change_pct >= 0 else 'warn' }}">{{ h.change_pct }}%</td>
-                    <td>{{ h.monthly_rsi }}</td>
-                    <td>{{ h.weekly_rsi }}</td>
-                    <td>{{ h.daily_rsi }}</td>
-                    <td>{{ ', '.join(h.triggers) }}</td>
+                    <td>{{ h.monthly_rsi if h.monthly_rsi is not none else '-' }}</td>
+                    <td>{{ h.weekly_rsi if h.weekly_rsi is not none else '-' }}</td>
+                    <td>{{ h.daily_rsi if h.daily_rsi is not none else '-' }}</td>
+                    <td>{{ h.stop_loss if h.stop_loss is not none else '-' }}</td>
+                    <td>{{ h.targets if h.targets else '-' }}</td>
+                    <td>{{ h.support if h.support is not none and h.support != 0 else '-' }}</td>
+                    <td>{{ h.resistance if h.resistance is not none and h.resistance != 0 else '-' }}</td>
+                    <td class="{{ 'ok' if 'BUY' in h.signal else 'warn' }}"><strong>{{ h.signal }}</strong></td>
+                    <td>{{ ', '.join(h.triggers) if h.triggers else '-' }}</td>
                     <td>
                         <svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none" role="img" aria-label="Price trend">
                             <polyline points="{{ h.sparkline }}" fill="none" stroke="#1f6f78" stroke-width="1.5" />
@@ -94,3 +116,4 @@
 </main>
 </body>
 </html>
+

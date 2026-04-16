@@ -7,13 +7,21 @@ from fastapi.templating import Jinja2Templates
 
 from app.config import get_settings
 from app.db import SessionLocal, get_state, init_db, set_state
-from app.models import AutomationRequest, SessionStatus, TradeRequest
+from app.models import (
+    AutomationRequest,
+    PaperBotRequest,
+    PaperFundRequest,
+    PaperTradeRequest,
+    SessionStatus,
+    TradeRequest,
+)
 from app.services.analysis import AnalysisService
 from app.services.angel_client import AngelClient
 from app.services.automation import AutomationService
 from app.services.strategy import StrategyService
 from app.services.trade_engine import TradeEngine
 from app.services.watchlist import WatchlistService
+from app.services.paper_trader import PaperTraderService
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name)
@@ -28,6 +36,7 @@ trade_engine = TradeEngine(angel_client)
 automation_service = AutomationService(analysis_service, trade_engine)
 watchlist_service = WatchlistService()
 strategy_service = StrategyService(angel_client, watchlist_service)
+paper_trader = PaperTraderService(strategy_service)
 
 
 @app.on_event('startup')
@@ -96,6 +105,45 @@ def stop_automation() -> dict:
     return {'ok': True, 'message': 'Automation stopped.'}
 
 
+@app.get('/api/paper/summary')
+def api_paper_summary() -> dict:
+    return paper_trader.summary()
+
+
+@app.post('/api/paper/fund')
+def api_paper_fund(req: PaperFundRequest) -> dict:
+    summary = paper_trader.reset_account(req.starting_cash)
+    return {'ok': True, 'summary': summary}
+
+
+@app.post('/api/paper/trade')
+def api_paper_trade(req: PaperTradeRequest) -> dict:
+    return paper_trader.manual_trade(
+        symbol=req.symbol.strip().upper(),
+        strategy=req.strategy,
+        action=req.action,
+        amount=req.amount,
+        refresh_signals=req.refresh_signals,
+    )
+
+
+@app.post('/api/paper/auto/start')
+def api_paper_auto_start(req: PaperBotRequest) -> dict:
+    paper_trader.start_auto(
+        strategy=req.strategy,
+        interval_minutes=req.interval_minutes,
+        max_trades_per_cycle=req.max_trades_per_cycle,
+        refresh_signals=req.refresh_signals,
+    )
+    return {'ok': True, 'message': 'Paper auto-trader started.'}
+
+
+@app.post('/api/paper/auto/stop')
+def api_paper_auto_stop() -> dict:
+    paper_trader.stop_auto()
+    return {'ok': True, 'message': 'Paper auto-trader stopped.'}
+
+
 @app.get('/api/watchlist')
 def api_watchlist() -> list[dict]:
     rows = watchlist_service.list_items()
@@ -112,8 +160,28 @@ def api_watchlist() -> list[dict]:
     ]
 
 
-@app.get('/api/strategies/rsa-scan')
+@app.get('/api/strategies/scan')
 def api_strategy_scan(
+    strategy: str = Query(default='rsi'),
+    sector: str = Query(default='all'),
+    trigger: str = Query(default='all'),
+    signal: str = Query(default='all'),
+    min_change_pct: float = Query(default=-100.0),
+    min_daily_rsi: float = Query(default=0.0),
+    limit: int = Query(default=10, ge=1, le=500),
+    refresh: bool = Query(default=False),
+) -> dict:
+    rows, error, _ = _get_strategy_rows(strategy, refresh)
+    if error:
+        return {'count': 0, 'hits': [], 'error': error}
+
+    filtered = _filter_rows(rows, sector, trigger, signal, min_change_pct, min_daily_rsi)
+    filtered = filtered[:limit]
+    return {'count': len(filtered), 'hits': filtered}
+
+
+@app.get('/api/strategies/rsa-scan')
+def api_strategy_scan_compat(
     sector: str = Query(default='all'),
     trigger: str = Query(default='all'),
     min_change_pct: float = Query(default=-100.0),
@@ -121,29 +189,16 @@ def api_strategy_scan(
     limit: int = Query(default=10, ge=1, le=500),
     refresh: bool = Query(default=False),
 ) -> dict:
-    hits, error = strategy_service.scan_rsa_flow(force_refresh=refresh)
-    if error:
-        return {'count': 0, 'hits': [], 'error': error}
-
-    filtered = _filter_hits(hits, sector, trigger, min_change_pct, min_daily_rsi)
-    filtered = filtered[:limit]
-    return {
-        'count': len(filtered),
-        'hits': [
-            {
-                'symbol': h.symbol,
-                'exchange': h.exchange,
-                'sector': h.sector,
-                'monthly_rsi': h.monthly_rsi,
-                'weekly_rsi': h.weekly_rsi,
-                'daily_rsi': h.daily_rsi,
-                'change_pct': h.change_pct,
-                'triggers': h.triggers,
-                'note': h.note,
-            }
-            for h in filtered
-        ],
-    }
+    return api_strategy_scan(
+        strategy='rsi',
+        sector=sector,
+        trigger=trigger,
+        signal='all',
+        min_change_pct=min_change_pct,
+        min_daily_rsi=min_daily_rsi,
+        limit=limit,
+        refresh=refresh,
+    )
 
 
 @app.get('/', response_class=HTMLResponse)
@@ -190,6 +245,62 @@ def watchlist_page(request: Request):
     )
 
 
+@app.get('/paper', response_class=HTMLResponse)
+def paper_page(request: Request):
+    summary = paper_trader.summary()
+    return templates.TemplateResponse(
+        request=request,
+        name='paper.html',
+        context={'app_name': settings.app_name, 'summary': summary},
+    )
+
+
+@app.post('/paper/fund')
+def paper_fund(starting_cash: float = Form(...)):
+    paper_trader.reset_account(starting_cash)
+    return RedirectResponse('/paper', status_code=303)
+
+
+@app.post('/paper/manual')
+def paper_manual(
+    symbol: str = Form(...),
+    strategy: str = Form('merged'),
+    action: str = Form('AUTO'),
+    amount: float = Form(0.0),
+    refresh_signals: bool = Form(False),
+):
+    paper_trader.manual_trade(
+        symbol=symbol.strip().upper(),
+        strategy=strategy,
+        action=action,
+        amount=amount,
+        refresh_signals=refresh_signals,
+    )
+    return RedirectResponse('/paper', status_code=303)
+
+
+@app.post('/paper/auto/start')
+def paper_auto_start(
+    strategy: str = Form('merged'),
+    interval_minutes: int = Form(15),
+    max_trades_per_cycle: int = Form(3),
+    refresh_signals: bool = Form(True),
+):
+    paper_trader.start_auto(
+        strategy=strategy,
+        interval_minutes=interval_minutes,
+        max_trades_per_cycle=max_trades_per_cycle,
+        refresh_signals=refresh_signals,
+    )
+    return RedirectResponse('/paper', status_code=303)
+
+
+@app.post('/paper/auto/stop')
+def paper_auto_stop():
+    paper_trader.stop_auto()
+    return RedirectResponse('/paper', status_code=303)
+
+
 @app.post('/watchlist/add')
 def watchlist_add(
     symbol: str = Form(...),
@@ -222,17 +333,19 @@ def watchlist_toggle(symbol: str = Form(...), enabled: str = Form(...)):
 @app.get('/strategies', response_class=HTMLResponse)
 def strategies_page(
     request: Request,
+    strategy: str = Query(default='rsi'),
     sector: str = Query(default='all'),
     trigger: str = Query(default='all'),
+    signal: str = Query(default='all'),
     min_change_pct: float = Query(default=-100.0),
     min_daily_rsi: float = Query(default=0.0),
     limit: int = Query(default=10),
     refresh: bool = Query(default=False),
 ):
-    hits, error = strategy_service.scan_rsa_flow(force_refresh=refresh)
-    filtered = _filter_hits(hits, sector, trigger, min_change_pct, min_daily_rsi)
+    rows, error, sectors = _get_strategy_rows(strategy, refresh)
+    filtered = _filter_rows(rows, sector, trigger, signal, min_change_pct, min_daily_rsi)
     filtered = filtered[: max(1, min(limit, 500))]
-    sectors = sorted({h.sector for h in hits})
+
     return templates.TemplateResponse(
         request=request,
         name='strategies.html',
@@ -240,12 +353,14 @@ def strategies_page(
             'app_name': settings.app_name,
             'watchlist_count': len(watchlist_service.enabled_items()),
             'hits': filtered,
-            'all_hits_count': len(hits),
+            'all_hits_count': len(rows),
             'error': error,
             'sectors': sectors,
             'filters': {
+                'strategy': strategy,
                 'sector': sector,
                 'trigger': trigger,
+                'signal': signal,
                 'min_change_pct': min_change_pct,
                 'min_daily_rsi': min_daily_rsi,
                 'limit': limit,
@@ -265,16 +380,92 @@ def dashboard_connect():
     return connect_session()
 
 
-def _filter_hits(hits, sector: str, trigger: str, min_change_pct: float, min_daily_rsi: float):
+def _get_strategy_rows(strategy: str, refresh: bool):
+    strategy = (strategy or 'rsi').lower().strip()
+    if strategy == 'supertrend':
+        hits, error = strategy_service.scan_supertrend(force_refresh=refresh)
+        rows = [
+            {
+                'symbol': h.symbol,
+                'sector': h.sector,
+                'change_pct': h.change_pct,
+                'monthly_rsi': None,
+                'weekly_rsi': None,
+                'daily_rsi': None,
+                'triggers': [],
+                'stop_loss': None,
+                'targets': [],
+                'support': h.support,
+                'resistance': h.resistance,
+                'supertrend': h.supertrend,
+                'signal': h.signal,
+                'sparkline': h.sparkline,
+                'note': h.note,
+            }
+            for h in hits
+        ]
+    elif strategy == 'merged':
+        hits, error = strategy_service.scan_merged(force_refresh=refresh)
+        rows = [
+            {
+                'symbol': h.symbol,
+                'sector': h.sector,
+                'change_pct': h.change_pct,
+                'monthly_rsi': h.monthly_rsi,
+                'weekly_rsi': h.weekly_rsi,
+                'daily_rsi': h.daily_rsi,
+                'triggers': h.triggers,
+                'stop_loss': h.stop_loss,
+                'targets': h.targets,
+                'support': h.support,
+                'resistance': h.resistance,
+                'supertrend': h.supertrend,
+                'signal': h.signal,
+                'sparkline': h.sparkline,
+                'note': h.note,
+            }
+            for h in hits
+        ]
+    else:
+        hits, error = strategy_service.scan_rsa_flow(force_refresh=refresh)
+        rows = [
+            {
+                'symbol': h.symbol,
+                'sector': h.sector,
+                'change_pct': h.change_pct,
+                'monthly_rsi': h.monthly_rsi,
+                'weekly_rsi': h.weekly_rsi,
+                'daily_rsi': h.daily_rsi,
+                'triggers': h.triggers,
+                'stop_loss': h.stop_loss,
+                'targets': h.targets,
+                'support': None,
+                'resistance': None,
+                'supertrend': None,
+                'signal': h.action,
+                'sparkline': h.sparkline,
+                'note': h.note,
+            }
+            for h in hits
+        ]
+
+    sectors = sorted({r['sector'] for r in rows})
+    return rows, error, sectors
+
+
+def _filter_rows(rows, sector: str, trigger: str, signal: str, min_change_pct: float, min_daily_rsi: float):
     out = []
-    for h in hits:
-        if sector != 'all' and h.sector != sector:
+    for r in rows:
+        if sector != 'all' and r.get('sector') != sector:
             continue
-        if trigger != 'all' and trigger not in h.triggers:
+        if trigger != 'all' and trigger not in r.get('triggers', []):
             continue
-        if h.change_pct < min_change_pct:
+        if signal != 'all' and r.get('signal') != signal:
             continue
-        if h.daily_rsi < min_daily_rsi:
+        if (r.get('change_pct') or 0.0) < min_change_pct:
             continue
-        out.append(h)
+        daily = r.get('daily_rsi')
+        if daily is not None and daily < min_daily_rsi:
+            continue
+        out.append(r)
     return out

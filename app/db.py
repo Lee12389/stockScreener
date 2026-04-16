@@ -57,6 +57,45 @@ class WatchlistItem(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
 
+class PaperAccount(Base):
+    __tablename__ = 'paper_account'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    starting_cash: Mapped[float] = mapped_column(Float, nullable=False, default=100000.0)
+    cash_balance: Mapped[float] = mapped_column(Float, nullable=False, default=100000.0)
+    realized_pnl: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class PaperPosition(Base):
+    __tablename__ = 'paper_positions'
+
+    symbol: Mapped[str] = mapped_column(String(32), primary_key=True)
+    exchange: Mapped[str] = mapped_column(String(16), nullable=False, default='NSE')
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    avg_price: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    strategy: Mapped[str] = mapped_column(String(32), nullable=False, default='manual')
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class PaperTrade(Base):
+    __tablename__ = 'paper_trades'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    symbol: Mapped[str] = mapped_column(String(32), nullable=False)
+    exchange: Mapped[str] = mapped_column(String(16), nullable=False, default='NSE')
+    side: Mapped[str] = mapped_column(String(8), nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    price: Mapped[float] = mapped_column(Float, nullable=False)
+    value: Mapped[float] = mapped_column(Float, nullable=False)
+    realized_pnl: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    strategy: Mapped[str] = mapped_column(String(32), nullable=False, default='manual')
+    signal: Mapped[str] = mapped_column(String(32), nullable=False, default='NA')
+    note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    balance_after: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+
+
 _db_path = Path(__file__).resolve().parents[1] / 'autotrader.db'
 _engine = create_engine(f'sqlite:///{_db_path}', future=True)
 SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False, expire_on_commit=False)
@@ -65,6 +104,7 @@ SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False, exp
 def init_db() -> None:
     Base.metadata.create_all(_engine)
     _ensure_watchlist_schema()
+    _ensure_paper_defaults()
 
 
 def get_state(session, key: str, default: str) -> str:
@@ -100,3 +140,15 @@ def _ensure_watchlist_schema() -> None:
             conn.execute(text("ALTER TABLE watchlist_items ADD COLUMN exchange VARCHAR(16) DEFAULT 'NSE'"))
         if 'symbol_token' not in cols:
             conn.execute(text("ALTER TABLE watchlist_items ADD COLUMN symbol_token VARCHAR(32)"))
+
+
+def _ensure_paper_defaults() -> None:
+    with _engine.begin() as conn:
+        exists = conn.execute(text("SELECT id FROM paper_account WHERE id = 1")).fetchone()
+        if not exists:
+            conn.execute(
+                text(
+                    "INSERT INTO paper_account (id, starting_cash, cash_balance, realized_pnl, updated_at) "
+                    "VALUES (1, 100000.0, 100000.0, 0.0, CURRENT_TIMESTAMP)"
+                )
+            )

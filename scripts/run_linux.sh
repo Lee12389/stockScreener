@@ -1,0 +1,12 @@
+﻿#!/usr/bin/env bash
+set -euo pipefail
+HOST=${1:-127.0.0.1}
+PORT=${2:-8000}
+
+if [ ! -d ".venv" ]; then
+  python3 -m venv .venv
+fi
+
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --host "$HOST" --port "$PORT" --reload
