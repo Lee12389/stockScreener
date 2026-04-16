@@ -1,0 +1,62 @@
+﻿:root {
+    --bg: #f7f7f2;
+    --card: #ffffff;
+    --text: #1e2728;
+    --muted: #5b6a69;
+    --line: #d9dfdf;
+    --good: #0f8a5f;
+    --warn: #bf360c;
+}
+
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    background: radial-gradient(circle at top right, #f2efe1, var(--bg));
+    color: var(--text);
+}
+.container {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 24px;
+}
+h1 { margin-bottom: 6px; }
+.meta { color: var(--muted); }
+.ok { color: var(--good); }
+.warn { color: var(--warn); }
+.card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 16px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+th, td {
+    text-align: left;
+    border-bottom: 1px solid var(--line);
+    padding: 8px;
+    font-size: 14px;
+}
+button {
+    background: #174d4f;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+}
+select {
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    margin-right: 8px;
+}
+.controls form {
+    margin-bottom: 10px;
+}

@@ -1,0 +1,73 @@
+﻿from __future__ import annotations
+
+from datetime import datetime
+from pathlib import Path
+
+from sqlalchemy import Boolean, DateTime, Float, Integer, String, create_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class TradeLog(Base):
+    __tablename__ = 'trade_logs'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    symbol: Mapped[str] = mapped_column(String(32), nullable=False)
+    action: Mapped[str] = mapped_column(String(8), nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    mode: Mapped[str] = mapped_column(String(12), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    order_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+
+class AppState(Base):
+    __tablename__ = 'app_state'
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(String(256), nullable=False)
+
+
+class AnalysisSnapshot(Base):
+    __tablename__ = 'analysis_snapshots'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    symbol: Mapped[str] = mapped_column(String(32), nullable=False)
+    change_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    suggestion: Mapped[str] = mapped_column(String(8), nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    reason: Mapped[str] = mapped_column(String(500), nullable=False)
+
+
+_db_path = Path(__file__).resolve().parents[1] / 'autotrader.db'
+_engine = create_engine(f'sqlite:///{_db_path}', future=True)
+SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False, expire_on_commit=False)
+
+
+def init_db() -> None:
+    Base.metadata.create_all(_engine)
+
+
+def get_state(session, key: str, default: str) -> str:
+    row = session.get(AppState, key)
+    if row is None:
+        row = AppState(key=key, value=default)
+        session.add(row)
+        session.commit()
+        return default
+    return row.value
+
+
+def set_state(session, key: str, value: str) -> None:
+    row = session.get(AppState, key)
+    if row is None:
+        row = AppState(key=key, value=value)
+        session.add(row)
+    else:
+        row.value = value
+    session.commit()
