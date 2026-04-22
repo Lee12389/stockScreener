@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-<main class="container">
+<main class="container scanner-page">
     <header class="topbar">
         <h1>Smart Scanner</h1>
         <nav>
@@ -52,46 +52,236 @@
             <button type="submit">Save Config</button>
             <a href="/scanner?refresh=true"><button type="button">Run Fresh Scan</button></a>
         </form>
+
+        <form action="/scanner/shortlist" method="post" class="inline-form mt8">
+            <input type="hidden" name="refresh" value="true" />
+            <input type="hidden" name="symbols" value="{% for h in result.hits %}{{ h.symbol }}{% if not loop.last %},{% endif %}{% endfor %}" />
+            <button type="submit">Run On Current Shortlist Only</button>
+        </form>
     </section>
 
     <section class="card">
-        <h2>Filtered Candidates ({{ result.count }})</h2>
+        <div class="scanner-topline">
+            <h2>Filtered Candidates (<span id="visible-count">{{ result.count }}</span>/<span id="total-count">{{ result.count }}</span>)</h2>
+            <details class="column-picker">
+                <summary>View Columns</summary>
+                <div class="column-grid" id="column-picker-grid">
+                    <label><input type="checkbox" data-col-toggle="symbol" checked /> Symbol</label>
+                    <label><input type="checkbox" data-col-toggle="signal" checked /> Signal</label>
+                    <label><input type="checkbox" data-col-toggle="score" checked /> Score</label>
+                    <label><input type="checkbox" data-col-toggle="change" checked /> % Change</label>
+                    <label><input type="checkbox" data-col-toggle="rsi" checked /> RSI</label>
+                    <label><input type="checkbox" data-col-toggle="ema" checked /> EMA 20/50/100/200</label>
+                    <label><input type="checkbox" data-col-toggle="sr" checked /> Support/Resistance</label>
+                    <label><input type="checkbox" data-col-toggle="macd" checked /> MACD</label>
+                    <label><input type="checkbox" data-col-toggle="super" checked /> Supertrend</label>
+                    <label><input type="checkbox" data-col-toggle="vol" checked /> Vol x</label>
+                    <label><input type="checkbox" data-col-toggle="reasons" checked /> Reasons</label>
+                    <label><input type="checkbox" data-col-toggle="trend" checked /> Trend</label>
+                    <label><input type="checkbox" data-col-toggle="buy" checked /> Add Bought</label>
+                </div>
+            </details>
+        </div>
+
         {% if result.error %}<p class="warn">{{ result.error }}</p>{% endif %}
-        <table>
-            <thead><tr><th>Symbol</th><th>Signal</th><th>Score</th><th>%</th><th>RSI</th><th>EMA20/50/100/200</th><th>S/R</th><th>MACD</th><th>Vol x</th><th>Reasons</th><th>Trend</th><th>Add Bought</th></tr></thead>
-            <tbody>
-            {% for h in result.hits %}
-            <tr>
-                <td>{{ h.symbol }}</td>
-                <td><strong>{{ h.signal }}</strong></td>
-                <td>{{ h.score }}</td>
-                <td class="{{ 'ok' if h.change_pct >= 0 else 'warn' }}">{{ h.change_pct }}</td>
-                <td>{{ h.daily_rsi }}</td>
-                <td>{{ h.ema20 }} / {{ h.ema50 }} / {{ h.ema100 }} / {{ h.ema200 }}</td>
-                <td>{{ h.support }} / {{ h.resistance }}</td>
-                <td>{{ h.macd }} / {{ h.macd_signal }}</td>
-                <td>{{ h.volume_ratio }}</td>
-                <td>{{ h.reasons }}</td>
-                <td>
-                    <svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none">
-                        <polyline points="{{ h.sparkline }}" fill="none" stroke="#1f6f78" stroke-width="1.5" />
-                    </svg>
-                </td>
-                <td>
-                    <form action="/scanner/bought/add" method="post" class="inline-form">
-                        <input type="hidden" name="symbol" value="{{ h.symbol }}" />
-                        <input type="number" step="0.1" name="entry_price" value="{{ h.resistance }}" style="width:90px" />
-                        <input type="number" name="quantity" value="1" style="width:70px" />
-                        <input type="text" name="note" placeholder="note" style="width:90px" />
-                        <button type="submit">Bought</button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+
+        <div class="scanner-filters inline-form">
+            <label>Symbol
+                <input type="text" id="filter-symbol" placeholder="e.g. TCS" />
+            </label>
+            <label>Signal
+                <select id="filter-signal">
+                    <option value="">All</option>
+                    <option value="BUY">BUY</option>
+                    <option value="WATCH">WATCH</option>
+                    <option value="IGNORE">IGNORE</option>
+                </select>
+            </label>
+            <label>Min Score
+                <input type="number" id="filter-score-min" step="0.01" placeholder="0.25" />
+            </label>
+            <label>Min % Change
+                <input type="number" id="filter-change-min" step="0.01" placeholder="-2" />
+            </label>
+            <label>Min RSI
+                <input type="number" id="filter-rsi-min" step="0.1" placeholder="50" />
+            </label>
+            <label>Min Vol x
+                <input type="number" id="filter-vol-min" step="0.1" placeholder="1.5" />
+            </label>
+            <label>Supertrend
+                <select id="filter-super">
+                    <option value="">All</option>
+                    <option value="STRONG_BUY">STRONG_BUY</option>
+                    <option value="BUY">BUY</option>
+                    <option value="SELL">SELL</option>
+                    <option value="STRONG_SELL">STRONG_SELL</option>
+                    <option value="HOLD">HOLD</option>
+                </select>
+            </label>
+            <button type="button" id="clear-filters">Clear Filters</button>
+        </div>
+
+        <div class="table-wrap">
+            <table id="scanner-table" class="wide-table">
+                <thead>
+                    <tr>
+                        <th data-col="symbol">Symbol</th>
+                        <th data-col="signal">Signal</th>
+                        <th data-col="score">Score</th>
+                        <th data-col="change">%</th>
+                        <th data-col="rsi">RSI (D/W/M)</th>
+                        <th data-col="ema">EMA20/50/100/200</th>
+                        <th data-col="sr">S/R</th>
+                        <th data-col="macd">MACD</th>
+                        <th data-col="super">Super</th>
+                        <th data-col="vol">Vol x</th>
+                        <th data-col="reasons">Reasons</th>
+                        <th data-col="trend">Trend</th>
+                        <th data-col="buy">Add Bought</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for h in result.hits %}
+                <tr class="scanner-row"
+                    data-symbol="{{ h.symbol }}"
+                    data-signal="{{ h.signal }}"
+                    data-score="{{ h.score }}"
+                    data-change="{{ h.change_pct }}"
+                    data-rsi="{{ h.daily_rsi }}"
+                    data-vol="{{ h.volume_ratio }}"
+                    data-super="{{ h.super_signal }}">
+                    <td data-col="symbol">{{ h.symbol }}</td>
+                    <td data-col="signal"><strong>{{ h.signal }}</strong></td>
+                    <td data-col="score">{{ h.score }}</td>
+                    <td data-col="change" class="{{ 'ok' if h.change_pct >= 0 else 'warn' }}">{{ h.change_pct }}</td>
+                    <td data-col="rsi">{{ h.daily_rsi }} / {{ h.weekly_rsi }} / {{ h.monthly_rsi }}</td>
+                    <td data-col="ema">{{ h.ema20 }} / {{ h.ema50 }} / {{ h.ema100 }} / {{ h.ema200 }}</td>
+                    <td data-col="sr">{{ h.support }} / {{ h.resistance }}</td>
+                    <td data-col="macd">{{ h.macd }} / {{ h.macd_signal }}</td>
+                    <td data-col="super">{{ h.super_signal }}</td>
+                    <td data-col="vol">{{ h.volume_ratio }}</td>
+                    <td data-col="reasons">{{ h.reasons|join(' | ') }}</td>
+                    <td data-col="trend">
+                        <svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none">
+                            <polyline points="{{ h.sparkline }}" fill="none" stroke="#1f6f78" stroke-width="1.5" />
+                        </svg>
+                    </td>
+                    <td data-col="buy">
+                        <form action="/scanner/bought/add" method="post" class="inline-form">
+                            <input type="hidden" name="symbol" value="{{ h.symbol }}" />
+                            <input type="number" step="0.1" name="entry_price" value="{{ h.resistance }}" style="width:90px" />
+                            <input type="number" name="quantity" value="1" style="width:70px" />
+                            <input type="text" name="note" placeholder="note" style="width:90px" />
+                            <button type="submit">Bought</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </section>
 </main>
+
+<script>
+(function () {
+    const table = document.getElementById('scanner-table');
+    if (!table) return;
+
+    const rows = Array.from(table.querySelectorAll('tbody tr.scanner-row'));
+    const visibleCount = document.getElementById('visible-count');
+
+    const controls = {
+        symbol: document.getElementById('filter-symbol'),
+        signal: document.getElementById('filter-signal'),
+        scoreMin: document.getElementById('filter-score-min'),
+        changeMin: document.getElementById('filter-change-min'),
+        rsiMin: document.getElementById('filter-rsi-min'),
+        volMin: document.getElementById('filter-vol-min'),
+        superSig: document.getElementById('filter-super'),
+    };
+
+    function parseNum(v) {
+        const n = parseFloat(v);
+        return Number.isFinite(n) ? n : null;
+    }
+
+    function applyFilters() {
+        const symbolText = (controls.symbol.value || '').trim().toUpperCase();
+        const signal = (controls.signal.value || '').trim().toUpperCase();
+        const minScore = parseNum(controls.scoreMin.value);
+        const minChange = parseNum(controls.changeMin.value);
+        const minRsi = parseNum(controls.rsiMin.value);
+        const minVol = parseNum(controls.volMin.value);
+        const superSig = (controls.superSig.value || '').trim().toUpperCase();
+
+        let count = 0;
+        rows.forEach((row) => {
+            const symbol = (row.dataset.symbol || '').toUpperCase();
+            const rowSignal = (row.dataset.signal || '').toUpperCase();
+            const rowScore = parseNum(row.dataset.score);
+            const rowChange = parseNum(row.dataset.change);
+            const rowRsi = parseNum(row.dataset.rsi);
+            const rowVol = parseNum(row.dataset.vol);
+            const rowSuper = (row.dataset.super || '').toUpperCase();
+
+            let show = true;
+            if (symbolText && !symbol.includes(symbolText)) show = false;
+            if (signal && rowSignal !== signal) show = false;
+            if (superSig && rowSuper !== superSig) show = false;
+            if (minScore !== null && (rowScore === null || rowScore < minScore)) show = false;
+            if (minChange !== null && (rowChange === null || rowChange < minChange)) show = false;
+            if (minRsi !== null && (rowRsi === null || rowRsi < minRsi)) show = false;
+            if (minVol !== null && (rowVol === null || rowVol < minVol)) show = false;
+
+            row.style.display = show ? '' : 'none';
+            if (show) count += 1;
+        });
+        if (visibleCount) visibleCount.textContent = String(count);
+    }
+
+    Object.values(controls).forEach((el) => {
+        el.addEventListener('input', applyFilters);
+        el.addEventListener('change', applyFilters);
+    });
+
+    const clearBtn = document.getElementById('clear-filters');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            Object.values(controls).forEach((el) => { el.value = ''; });
+            applyFilters();
+        });
+    }
+
+    function setColumnVisibility(col, visible) {
+        table.querySelectorAll('[data-col="' + col + '"]').forEach((cell) => {
+            cell.style.display = visible ? '' : 'none';
+        });
+    }
+
+    const defaults = {
+        ema: {{ 'true' if config.show_ema == 'true' else 'false' }},
+        rsi: {{ 'true' if config.show_rsi == 'true' else 'false' }},
+        macd: {{ 'true' if config.show_macd == 'true' else 'false' }},
+        super: {{ 'true' if config.show_supertrend == 'true' else 'false' }},
+        vol: {{ 'true' if config.show_volume == 'true' else 'false' }},
+        sr: {{ 'true' if config.show_sr == 'true' else 'false' }}
+    };
+
+    document.querySelectorAll('[data-col-toggle]').forEach((chk) => {
+        const col = chk.getAttribute('data-col-toggle');
+        if (Object.prototype.hasOwnProperty.call(defaults, col)) {
+            chk.checked = Boolean(defaults[col]);
+        }
+        setColumnVisibility(col, chk.checked);
+        chk.addEventListener('change', () => {
+            setColumnVisibility(col, chk.checked);
+        });
+    });
+
+    applyFilters();
+})();
+</script>
 </body>
 </html>
-

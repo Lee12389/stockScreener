@@ -225,6 +225,12 @@ def api_scanner_scan(refresh: bool = Query(default=False)) -> dict:
     return scanner_service.scan(force_refresh=refresh)
 
 
+@app.post('/api/scanner/scan-shortlist')
+def api_scanner_scan_shortlist(symbols: str = Form(...), refresh: bool = Form(default=True)) -> dict:
+    shortlist = [s.strip().upper() for s in symbols.split(',') if s.strip()]
+    return scanner_service.scan_shortlist(shortlist, force_refresh=refresh)
+
+
 @app.post('/api/scanner/bought/add')
 def api_scanner_bought_add(req: BoughtAddRequest) -> dict:
     return scanner_service.add_bought(
@@ -388,6 +394,18 @@ def tournament_page(request: Request):
 @app.get('/scanner', response_class=HTMLResponse)
 def scanner_page(request: Request, refresh: bool = Query(default=False)):
     result = scanner_service.scan(force_refresh=refresh)
+    cfg = scanner_service.get_config()
+    return templates.TemplateResponse(
+        request=request,
+        name='scanner.html',
+        context={'app_name': settings.app_name, 'result': result, 'config': cfg},
+    )
+
+
+@app.post('/scanner/shortlist', response_class=HTMLResponse)
+def scanner_shortlist_page(request: Request, symbols: str = Form(...), refresh: bool = Form(default=True)):
+    shortlist = [s.strip().upper() for s in symbols.split(',') if s.strip()]
+    result = scanner_service.scan_shortlist(shortlist, force_refresh=refresh)
     cfg = scanner_service.get_config()
     return templates.TemplateResponse(
         request=request,

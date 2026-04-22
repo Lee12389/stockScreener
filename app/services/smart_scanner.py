@@ -45,6 +45,19 @@ class SmartScannerService:
         )
 
         self.watchlist_service.bulk_add(universe, sector='Universe', source='scanner_universe')
+        return self._scan_symbols(cfg=cfg, symbols=universe, force_refresh=force_refresh)
+
+    def scan_shortlist(self, symbols: list[str], force_refresh: bool = False) -> dict:
+        cfg = self.get_config()
+        shortlist = [s.strip().upper() for s in symbols if s and s.strip()]
+        if not shortlist:
+            return {'error': 'No shortlist symbols provided.', 'hits': [], 'count': 0}
+        return self._scan_symbols(cfg=cfg, symbols=shortlist, force_refresh=force_refresh)
+
+    def _scan_symbols(self, cfg: dict, symbols: list[str], force_refresh: bool = False) -> dict:
+        symbol_set = {s.strip().upper() for s in symbols if s and s.strip()}
+        if not symbol_set:
+            return {'error': 'No symbols to scan.', 'hits': [], 'count': 0}
 
         market, err = self.strategy_service.get_market_snapshot(
             force_refresh=force_refresh,
@@ -63,7 +76,7 @@ class SmartScannerService:
         with SessionLocal() as session:
             hits = []
             for symbol, row in market.items():
-                if symbol not in universe:
+                if symbol.strip().upper() not in symbol_set:
                     continue
                 candle_last_ts = row.get('interval', '') + ':' + str(round(row.get('close', 0.0), 2))
                 cached = (
