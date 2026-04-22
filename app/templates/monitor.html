@@ -18,12 +18,13 @@
             <a href="/tournament">Tournament</a>
             <a href="/scanner">Scanner</a>
             <a href="/monitor" class="active">Monitor</a>
+            <a href="/options-lab">Options Lab</a>
         </nav>
     </header>
 
     <section class="card">
-        <h2>Reversal Alerts ({{ monitor.count }})</h2>
-        {% if monitor.error %}<p class="warn">{{ monitor.error }}</p>{% endif %}
+        <h2>Reversal Alerts ({{ monitor['count'] }})</h2>
+        {% if monitor['error'] %}<p class="warn">{{ monitor['error'] }}</p>{% endif %}
         <a href="/monitor?refresh=true"><button type="button">Refresh Monitor</button></a>
         <table>
             <thead><tr><th>Symbol</th><th>Entry</th><th>LTP</th><th>PnL</th><th>State</th><th>Reasons</th><th>Graph</th><th>Action</th></tr></thead>

@@ -5,6 +5,7 @@ Extensible FastAPI app for strategy scanning, paper trading, and future live aut
 ## Highlights
 
 - Angel One SmartAPI integration for symbol search, quotes, and candle history.
+- API-first architecture for heavy frontend rendering (web/mobile) while backend focuses on business logic and risk calculations.
 - Strategy page with:
   - RSI multi-timeframe flow
   - Supertrend support/resistance signals
@@ -46,6 +47,9 @@ bash ./scripts/run_linux.sh
 - `/strategies` RSI / Supertrend / merged signals
 - `/paper` paper trading account, manual and automated paper execution
 - `/tournament` 10-strategy bot tournament (each bot starts with configurable capital)
+- `/scanner` smart multi-timeframe scanner with indicator toggles
+- `/monitor` bought stocks reversal monitor (weak/strong sell)
+- `/options-lab` unified Nifty50 options strategy engine + custom strategy builder
 
 ## Key APIs
 
@@ -60,6 +64,30 @@ bash ./scripts/run_linux.sh
 - `POST /api/tournament/start`
 - `POST /api/tournament/stop`
 - `GET /api/tournament/leaderboard`
+- `POST /api/options/recommend`
+- `POST /api/options/custom`
+
+## Frontend-Heavy Architecture (Current Direction)
+
+- Backend responsibility:
+  - broker connection/session
+  - candle/option chain fetch
+  - indicator/risk/business calculations
+  - filtering/ranking/scoring
+  - paper-trade execution and ledger
+- Frontend responsibility:
+  - charts/graphs/payoff visuals
+  - interactive strategy building UX
+  - high-frequency UI updates and device-specific optimizations
+
+## Multi-Platform Plan (Web + Android + iOS)
+
+- Recommended stack:
+  - Web: React + Vite + TypeScript
+  - Mobile: React Native (Expo) reusing the same API contracts
+  - Charts: TradingView Lightweight Charts / ECharts (frontend render)
+- Current backend already supports this with REST endpoints.
+- CORS is enabled (`CORS_ORIGINS`) so separate frontend apps can connect.
 
 ## Notes
 
@@ -67,6 +95,4 @@ bash ./scripts/run_linux.sh
 - After first scan, cached data returns quickly unless `refresh=true` is used.
 - Live trading stays disabled unless explicitly enabled with env + mode switch.
 
-- /scanner smart multi-timeframe scanner with indicator toggles
-- /monitor bought stocks reversal monitor (weak/strong sell)
 

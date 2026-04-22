@@ -1,6 +1,7 @@
-﻿# Local secrets/config (do not commit)
+# Local secrets/config (do not commit)
 .env
 defaults.yaml
+.venv/
 
 # Runtime artifacts
 autotrader.db

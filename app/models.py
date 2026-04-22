@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+from datetime import datetime
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
@@ -106,3 +106,17 @@ class BoughtAddRequest(BaseModel):
     entry_price: float = Field(ge=0.0)
     quantity: int = Field(default=1, ge=1)
     note: str = ''
+
+
+class OptionsLabRequest(BaseModel):
+    spot: float = Field(gt=0)
+    capital: float = Field(gt=1000)
+    option_rows_csv: str
+
+
+class OptionsCustomRequest(BaseModel):
+    spot: float = Field(gt=0)
+    capital: float = Field(gt=1000)
+    option_rows_csv: str = ''
+    legs_csv: str
+    lot_size: int = Field(default=50, ge=1, le=10000)

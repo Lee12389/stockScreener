@@ -31,10 +31,16 @@ class Settings(BaseSettings):
     angel_totp_secret: str = Field(default='', alias='ANGEL_TOTP_SECRET')
 
     watchlist: str = Field(default='SBIN-EQ,RELIANCE-EQ,INFY-EQ', alias='WATCHLIST')
+    cors_origins: str = Field(default='*', alias='CORS_ORIGINS')
 
     @property
     def watchlist_symbols(self) -> List[str]:
         return [s.strip() for s in self.watchlist.split(',') if s.strip()]
+
+    @property
+    def cors_origin_list(self) -> List[str]:
+        raw = [s.strip() for s in self.cors_origins.split(',') if s.strip()]
+        return raw or ['*']
 
 
 def _load_defaults_yaml() -> dict:
@@ -81,6 +87,7 @@ def get_settings() -> Settings:
         ('angel_pin', 'ANGEL_PIN'),
         ('angel_totp_secret', 'ANGEL_TOTP_SECRET'),
         ('watchlist', 'WATCHLIST'),
+        ('cors_origins', 'CORS_ORIGINS'),
     ]
 
     for field_name, alias in field_alias_pairs:

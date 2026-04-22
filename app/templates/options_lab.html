@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ app_name }} - Nifty Options Lab</title>
+    <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+<main class="container">
+    <header class="topbar">
+        <h1>Nifty50 Options Engine</h1>
+        <nav>
+            <a href="/">Dashboard</a>
+            <a href="/watchlist">Watchlist</a>
+            <a href="/strategies">Strategies</a>
+            <a href="/paper">Paper</a>
+            <a href="/tournament">Tournament</a>
+            <a href="/scanner">Scanner</a>
+            <a href="/monitor">Monitor</a>
+            <a href="/options-lab" class="active">Options Lab</a>
+        </nav>
+    </header>
+
+    <section class="card">
+        <h2>Chain Input + Controls</h2>
+        <p class="meta">Unified workflow: default OI/volume strategy + custom builder with payoff, max loss/profit, PoP, breakevens, and risk.</p>
+        <form action="/options-lab" method="post">
+            <div class="inline-form">
+                <label>Spot
+                    <input type="number" step="0.01" name="spot" value="{{ spot }}" required />
+                </label>
+                <label>Capital
+                    <input type="number" step="100" name="capital" value="{{ capital }}" required />
+                </label>
+                <label>Lot Size
+                    <input type="number" min="1" step="1" name="lot_size" value="{{ lot_size }}" />
+                </label>
+            </div>
+            <label>Option Chain CSV</label>
+            <textarea name="option_rows_csv" rows="7" class="fullwidth">{{ sample_csv }}</textarea>
+            <label>Custom Legs CSV (`side,kind,strike,premium,qty`)</label>
+            <textarea name="legs_csv" rows="6" class="fullwidth">{{ sample_legs }}</textarea>
+            <div class="inline-form mt8">
+                <button type="submit" name="mode" value="recommend">Run Default Best Strategy</button>
+                <button type="submit" name="mode" value="custom">Run Custom Strategy Builder</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>Default Recommendation</h2>
+        {% if recommendation and recommendation.error %}
+            <p class="warn">{{ recommendation.error }}</p>
+        {% elif recommendation %}
+            <p class="meta">Bias: <strong>{{ recommendation.bias }}</strong> | Spot: <strong>{{ recommendation.spot }}</strong> | Support: <strong>{{ recommendation.support }}</strong> | Resistance: <strong>{{ recommendation.resistance }}</strong></p>
+            {% if recommendation.default_best %}
+            <div class="pillbar">
+                <span class="pill good">Best: {{ recommendation.default_best.name }}</span>
+                <span class="pill">PoW {{ recommendation.default_best.probability_of_win_pct }}%</span>
+                <span class="pill">RR {{ recommendation.default_best.risk_reward }}</span>
+                <span class="pill">Risk {{ recommendation.default_best.capital_at_risk_pct }}%</span>
+            </div>
+            {% endif %}
+            <table>
+                <thead><tr><th>Rank</th><th>Strategy</th><th>Legs</th><th>Max Profit</th><th>Max Loss</th><th>PoW %</th><th>PoL %</th><th>RR</th><th>Expectancy</th><th>OI+Vol Score</th></tr></thead>
+                <tbody>
+                {% for s in recommendation.strategies %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td><strong>{{ s.name }}</strong></td>
+                    <td>{{ s.legs }}</td>
+                    <td class="ok">{{ s.max_profit }}</td>
+                    <td class="warn">{{ s.max_loss }}</td>
+                    <td>{{ s.probability_of_win_pct }}</td>
+                    <td>{{ s.probability_of_loss_pct }}</td>
+                    <td>{{ s.risk_reward }}</td>
+                    <td>{{ s.expectancy }}</td>
+                    <td>{{ s.score }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="meta">Run "Default Best Strategy" to get OI/volume-based recommendation.</p>
+        {% endif %}
+    </section>
+
+    <section class="card">
+        <h2>Custom Strategy Builder</h2>
+        {% if custom_result and custom_result.error %}
+            <p class="warn">{{ custom_result.error }}</p>
+        {% elif custom_result %}
+            <div class="pillbar">
+                <span class="pill">Max Profit: {{ custom_result.max_profit if custom_result.max_profit is not none else 'Unlimited' }}</span>
+                <span class="pill">Max Loss: {{ custom_result.max_loss }}</span>
+                <span class="pill">PoP: {{ custom_result.probability_of_profit_pct }}%</span>
+                <span class="pill">PoL: {{ custom_result.probability_of_loss_pct }}%</span>
+                <span class="pill">Cap at Risk: {{ custom_result.capital_at_risk }} ({{ custom_result.capital_at_risk_pct }}%)</span>
+            </div>
+
+            <h3>Legs</h3>
+            <table>
+                <thead><tr><th>Side</th><th>Type</th><th>Strike</th><th>Premium</th><th>Qty</th></tr></thead>
+                <tbody>
+                {% for l in custom_result.legs %}
+                <tr>
+                    <td>{{ l.side }}</td>
+                    <td>{{ l.kind }}</td>
+                    <td>{{ l.strike }}</td>
+                    <td>{{ l.premium }}</td>
+                    <td>{{ l.quantity }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+
+            <p class="meta">Breakevens: {% if custom_result.breakevens %}{{ custom_result.breakevens|join(', ') }}{% else %}No clear crossing in sampled range{% endif %}</p>
+
+            <div class="payoff-wrap">
+                <svg class="payoff" viewBox="0 0 100 60" preserveAspectRatio="none">
+                    <line x1="0" y1="30" x2="100" y2="30" stroke="#b7c6c6" stroke-width="0.5" />
+                    <polyline points="{{ custom_result.payoff_svg }}" fill="none" stroke="#174d4f" stroke-width="1.7" />
+                </svg>
+            </div>
+        {% else %}
+            <p class="meta">Run "Custom Strategy Builder" to evaluate your legs like a Sensibull-style payoff preview.</p>
+        {% endif %}
+    </section>
+</main>
+</body>
+</html>

@@ -1,6 +1,7 @@
 ﻿from pathlib import Path
 
 from fastapi import FastAPI, Form, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -10,9 +11,11 @@ from app.db import SessionLocal, get_state, init_db, set_state
 from app.models import (
     AutomationRequest,
     BoughtAddRequest,
+    OptionsCustomRequest,
     PaperBotRequest,
     PaperFundRequest,
     PaperTradeRequest,
+    OptionsLabRequest,
     ScannerConfigRequest,
     SessionStatus,
     TournamentInitRequest,
@@ -29,9 +32,17 @@ from app.services.trade_engine import TradeEngine
 from app.services.watchlist import WatchlistService
 from app.services.paper_trader import PaperTraderService
 from app.services.smart_scanner import SmartScannerService
+from app.services.options_strategy import OptionsStrategyService
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origin_list,
+    allow_credentials=True,
+    allow_methods=['*'],
+    allow_headers=['*'],
+)
 
 base_dir = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(base_dir / 'templates'))
@@ -46,6 +57,7 @@ strategy_service = StrategyService(angel_client, watchlist_service)
 paper_trader = PaperTraderService(strategy_service)
 tournament_service = StrategyTournamentService(strategy_service)
 scanner_service = SmartScannerService(strategy_service, watchlist_service)
+options_service = OptionsStrategyService()
 
 
 @app.on_event('startup')
@@ -233,6 +245,25 @@ def api_scanner_bought_monitor(refresh: bool = Query(default=False)) -> dict:
     return scanner_service.monitor_bought(force_refresh=refresh)
 
 
+@app.post('/api/options/recommend')
+def api_options_recommend(req: OptionsLabRequest) -> dict:
+    rows = options_service.parse_rows(req.option_rows_csv)
+    return options_service.recommend(spot=req.spot, capital=req.capital, rows=rows)
+
+
+@app.post('/api/options/custom')
+def api_options_custom(req: OptionsCustomRequest) -> dict:
+    rows = options_service.parse_rows(req.option_rows_csv)
+    legs = options_service.parse_legs(req.legs_csv)
+    return options_service.custom_strategy(
+        spot=req.spot,
+        capital=req.capital,
+        rows=rows,
+        legs=legs,
+        lot_size=req.lot_size,
+    )
+
+
 @app.get('/api/watchlist')
 def api_watchlist() -> list[dict]:
     rows = watchlist_service.list_items()
@@ -375,6 +406,37 @@ def monitor_page(request: Request, refresh: bool = Query(default=False)):
     )
 
 
+@app.get('/options-lab', response_class=HTMLResponse)
+def options_lab_page(request: Request):
+    sample = (
+        "# strike,call_oi,put_oi,call_iv,put_iv,call_ltp,put_ltp,call_volume,put_volume\n"
+        "22400,120000,90000,14.2,16.3,180,40,250000,190000\n"
+        "22500,160000,130000,15.1,15.8,130,55,320000,220000\n"
+        "22600,140000,170000,15.8,15.1,95,75,280000,260000\n"
+        "22700,90000,180000,16.4,14.7,68,102,170000,300000\n"
+    )
+    sample_legs = (
+        "# side,kind,strike,premium,qty\n"
+        "buy,call,22500,130,1\n"
+        "sell,call,22600,95,1\n"
+    )
+    return templates.TemplateResponse(
+        request=request,
+        name='options_lab.html',
+        context={
+            'app_name': settings.app_name,
+            'sample_csv': sample,
+            'sample_legs': sample_legs,
+            'recommendation': None,
+            'custom_result': None,
+            'active_tab': 'recommend',
+            'spot': 22520,
+            'capital': 100000,
+            'lot_size': 50,
+        },
+    )
+
+
 @app.post('/paper/fund')
 def paper_fund(starting_cash: float = Form(...)):
     paper_trader.reset_account(starting_cash)
@@ -495,6 +557,45 @@ def scanner_bought_add(symbol: str = Form(...), entry_price: float = Form(...), 
 def scanner_bought_remove(symbol: str = Form(...)):
     scanner_service.remove_bought(symbol.strip().upper())
     return RedirectResponse('/monitor', status_code=303)
+
+
+@app.post('/options-lab')
+def options_lab_run(
+    request: Request,
+    spot: float = Form(...),
+    capital: float = Form(...),
+    option_rows_csv: str = Form(...),
+    legs_csv: str = Form(''),
+    lot_size: int = Form(50),
+    mode: str = Form('recommend'),
+):
+    rows = options_service.parse_rows(option_rows_csv)
+    recommendation = options_service.recommend(spot=spot, capital=capital, rows=rows)
+    custom_result = None
+    if mode == 'custom':
+        legs = options_service.parse_legs(legs_csv)
+        custom_result = options_service.custom_strategy(
+            spot=spot,
+            capital=capital,
+            rows=rows,
+            legs=legs,
+            lot_size=lot_size,
+        )
+    return templates.TemplateResponse(
+        request=request,
+        name='options_lab.html',
+        context={
+            'app_name': settings.app_name,
+            'sample_csv': option_rows_csv,
+            'sample_legs': legs_csv,
+            'recommendation': recommendation,
+            'custom_result': custom_result,
+            'active_tab': mode,
+            'spot': spot,
+            'capital': capital,
+            'lot_size': lot_size,
+        },
+    )
 
 
 @app.post('/watchlist/add')

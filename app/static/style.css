@@ -78,6 +78,15 @@ select, input {
     border: 1px solid var(--line);
     margin-right: 8px;
 }
+textarea {
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    font-family: Consolas, "Courier New", monospace;
+}
+.fullwidth {
+    width: 100%;
+}
 .inline-form label {
     font-size: 12px;
     color: var(--muted);
@@ -101,6 +110,37 @@ select, input {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
+}
+.pillbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+.pill {
+    display: inline-block;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    font-size: 12px;
+    background: #f8fbfa;
+}
+.pill.good {
+    background: #e9f8f1;
+    color: var(--good);
+    border-color: #b6e3cf;
+}
+.payoff-wrap {
+    margin-top: 10px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: linear-gradient(180deg, #ffffff 0%, #f6faf9 100%);
+    padding: 8px;
+}
+.payoff {
+    width: 100%;
+    height: 220px;
+    display: block;
 }
 
 @media (max-width: 768px) {
