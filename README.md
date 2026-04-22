@@ -76,6 +76,26 @@ npm run ios
 
 Set `EXPO_PUBLIC_API_BASE_URL` or update the in-app Settings screen if the client needs to reach a different backend host than the default local machine target.
 
+### Android Debug Build / Install (Windows)
+
+Use the helper below to generate the native Android project, build a debug APK, and install it to a USB-connected Android phone when one is available:
+
+```powershell
+./scripts/install_android_debug.ps1
+./scripts/install_android_debug.ps1 -NoInstall
+```
+
+The script auto-detects the local Android SDK and JDK, then builds `client/android/app/build/outputs/apk/debug/app-debug.apk`.
+
+Fresh `npm install` runs automatically re-apply the native Windows linker workaround through `patch-package`, so the Android client stays buildable after dependency reinstalls.
+
+### iOS Note
+
+Local iOS installs require macOS + Xcode. The shared Expo Router client is kept iOS-compatible, but on Windows you should either:
+
+- run the web client locally, or
+- build iOS from a Mac or EAS Build
+
 ## Cleanup / Maintenance
 
 Use the cleanup helpers to prune stale SQLite rows, temporary caches, and old compiled files from the repo.
@@ -141,8 +161,9 @@ The cleanup tool uses Python's built-in `sqlite3` module and supports retention 
 - Shared Expo Router app now lives in `client/`.
 - The same client codebase serves:
   - web via Expo web export/dev server
-  - Android via Expo/Android tooling
-  - iOS via Expo/iOS tooling
+  - Android via Expo/Android tooling and the Windows debug APK helper
+  - iOS via Expo/iOS tooling on macOS or EAS Build
+- GitHub Actions now build-check the shared client on web, Android, and iOS hosts and publish the web bundle plus Android debug APK as workflow artifacts.
 - CORS is enabled (`CORS_ORIGINS`) so the Expo web client can connect to the backend.
 - The in-app Settings screen lets phones point to the laptop LAN IP when you run the backend locally.
 

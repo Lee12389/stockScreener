@@ -1,0 +1,45 @@
+diff --git a/node_modules/react-native-screens/android/CMakeLists.txt b/node_modules/react-native-screens/android/CMakeLists.txt
+index 86ec079..0d765bb 100644
+--- a/node_modules/react-native-screens/android/CMakeLists.txt
++++ b/node_modules/react-native-screens/android/CMakeLists.txt
+@@ -47,6 +47,7 @@ if(${RNS_NEW_ARCH_ENABLED})
+             ReactAndroid::jsi
+             fbjni::fbjni
+             android
++            c++
+         )
+     else()
+         target_link_libraries(
+@@ -70,11 +71,13 @@ if(${RNS_NEW_ARCH_ENABLED})
+                 ReactAndroid::react_render_observers_events
+                 fbjni::fbjni
+                 android
++                c++
+         )
+     endif()
+ else()
+     target_link_libraries(rnscreens
+         ReactAndroid::jsi
+         android
++        c++
+     )
+ endif()
+diff --git a/node_modules/react-native-screens/android/src/main/jni/CMakeLists.txt b/node_modules/react-native-screens/android/src/main/jni/CMakeLists.txt
+index 1b26dac..02664c6 100644
+--- a/node_modules/react-native-screens/android/src/main/jni/CMakeLists.txt
++++ b/node_modules/react-native-screens/android/src/main/jni/CMakeLists.txt
+@@ -45,6 +45,7 @@ if(ReactAndroid_VERSION_MINOR GREATER_EQUAL 76)
+     ReactAndroid::reactnative
+     ReactAndroid::jsi
+     fbjni::fbjni
++    c++
+   )
+ else()
+   target_link_libraries(
+@@ -65,6 +66,7 @@ else()
+     rrc_view
+     turbomodulejsijni
+     yoga
++    c++
+   )
+ endif()
