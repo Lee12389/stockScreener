@@ -88,6 +88,7 @@ class StrategyTournamentService:
         self.scheduler.remove_all_jobs()
 
     def leaderboard(self) -> dict:
+        jobs = self.scheduler.get_jobs()
         with SessionLocal() as session:
             bots = session.query(StrategyBot).all()
             rows = []
@@ -134,7 +135,12 @@ class StrategyTournamentService:
                 for t in recent
             ]
 
-            return {'bots': rows, 'recent_trades': recent_rows}
+            return {
+                'running': any(job.id == 'strategy_tournament' for job in jobs),
+                'jobs': [job.id for job in jobs],
+                'bots': rows,
+                'recent_trades': recent_rows,
+            }
 
     def _process_bot(self, session, bot: StrategyBot, market: dict[str, dict]) -> None:
         positions = session.query(StrategyBotPosition).filter(StrategyBotPosition.bot_id == bot.id).all()

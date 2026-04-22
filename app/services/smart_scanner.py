@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from datetime import datetime
 
 from app.db import BoughtMonitor, ScanResultCache, ScannerConfig, SessionLocal
 from app.services.universe import build_universe
@@ -53,6 +54,47 @@ class SmartScannerService:
         if not shortlist:
             return {'error': 'No shortlist symbols provided.', 'hits': [], 'count': 0}
         return self._scan_symbols(cfg=cfg, symbols=shortlist, force_refresh=force_refresh)
+
+    def get_dataset(self, force_refresh: bool = False, symbols: list[str] | None = None) -> dict:
+        cfg = self.get_config()
+
+        if symbols:
+            universe = sorted({s.strip().upper() for s in symbols if s and s.strip()})
+        else:
+            watch_custom = [w.symbol for w in self.watchlist_service.enabled_items() if w.source == 'manual']
+            universe = build_universe(
+                include_nifty50=(cfg['include_nifty50'] == 'true'),
+                include_midcap150=(cfg['include_midcap150'] == 'true'),
+                include_nifty500=(cfg['include_nifty500'] == 'true'),
+                custom_symbols=watch_custom,
+            )
+
+        if not universe:
+            return {
+                'error': 'No symbols available for the selected scanner universe.',
+                'items': [],
+                'count': 0,
+                'config': cfg,
+                'bought': self.list_bought(),
+                'generated_at': datetime.utcnow().isoformat() + 'Z',
+                'scope_symbols': [],
+            }
+
+        self.watchlist_service.bulk_add(universe, sector='Universe', source='scanner_universe')
+        items, err = self.strategy_service.get_market_dataset(
+            universe,
+            force_refresh=force_refresh,
+            interval=cfg['scan_interval'],
+        )
+        return {
+            'error': err,
+            'items': items,
+            'count': len(items),
+            'config': cfg,
+            'bought': self.list_bought(),
+            'generated_at': datetime.utcnow().isoformat() + 'Z',
+            'scope_symbols': universe,
+        }
 
     def _scan_symbols(self, cfg: dict, symbols: list[str], force_refresh: bool = False) -> dict:
         symbol_set = {s.strip().upper() for s in symbols if s and s.strip()}
@@ -143,6 +185,20 @@ class SmartScannerService:
                 session.delete(row)
                 session.commit()
         return {'ok': True}
+
+    def list_bought(self) -> list[dict]:
+        with SessionLocal() as session:
+            rows = session.query(BoughtMonitor).order_by(BoughtMonitor.symbol).all()
+            return [
+                {
+                    'symbol': row.symbol,
+                    'exchange': row.exchange,
+                    'entry_price': row.entry_price,
+                    'quantity': row.quantity,
+                    'note': row.note or '',
+                }
+                for row in rows
+            ]
 
     def monitor_bought(self, force_refresh: bool = False) -> dict:
         cfg = self.get_config()

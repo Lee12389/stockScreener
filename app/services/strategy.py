@@ -64,9 +64,8 @@ class StrategyService:
         self.angel_client = angel_client
         self.watchlist_service = watchlist_service
         self.cache_ttl = timedelta(minutes=5)
-        self._market_cache: dict[str, dict] = {}
-        self._market_cache_error: str | None = None
-        self._market_cache_at: datetime | None = None
+        self._market_cache: dict[str, tuple[datetime, dict[str, dict], str | None]] = {}
+        self._dataset_cache: dict[str, tuple[datetime, list[dict], str | None]] = {}
 
     def scan_rsa_flow(self, force_refresh: bool = False) -> tuple[list[RsiHit], str | None]:
         market, error = self._load_market_data(force_refresh=force_refresh)
@@ -145,7 +144,7 @@ class StrategyService:
         macd_fast: int = 12,
         macd_slow: int = 26,
         macd_signal: int = 9,
-    ) -> tuple[dict[str, dict], str | None]:
+        ) -> tuple[dict[str, dict], str | None]:
         return self._load_market_data(
             force_refresh=force_refresh,
             interval=interval,
@@ -155,6 +154,127 @@ class StrategyService:
             macd_slow=macd_slow,
             macd_signal=macd_signal,
         )
+
+    def get_market_dataset(
+        self,
+        symbols: list[str],
+        force_refresh: bool = False,
+        interval: str = 'FIFTEEN_MINUTE',
+        daily_days: int = 320,
+    ) -> tuple[list[dict], str | None]:
+        normalized_interval = _normalize_interval(interval)
+        normalized = sorted({s.strip().upper() for s in symbols if s and s.strip()})
+        if not normalized:
+            return [], 'No symbols were provided for the scanner dataset.'
+
+        cache_key = f"{normalized_interval}:{daily_days}:{'|'.join(normalized)}"
+        cached = self._dataset_cache.get(cache_key)
+        if cached and not force_refresh and datetime.utcnow() - cached[0] < self.cache_ttl:
+            return cached[1], cached[2]
+
+        ok, msg = self.angel_client.ensure_connected()
+        if not ok:
+            error = f'Angel session unavailable: {msg}'
+            self._dataset_cache[cache_key] = (datetime.utcnow(), [], error)
+            return [], error
+
+        watch_map = {
+            item.symbol.strip().upper(): item
+            for item in self.watchlist_service.enabled_items()
+        }
+
+        dataset: list[dict] = []
+        for symbol in normalized:
+            item = watch_map.get(symbol)
+            if item is None:
+                continue
+
+            exchange = (item.exchange or 'NSE').strip().upper() or 'NSE'
+            token = (item.symbol_token or '').strip()
+            resolved_symbol = symbol
+
+            if not token:
+                resolved_token, resolved_symbol_name = self.angel_client.resolve_symbol_token(exchange, symbol)
+                if not resolved_token:
+                    continue
+                token = resolved_token
+                if resolved_symbol_name:
+                    resolved_symbol = resolved_symbol_name
+                self.watchlist_service.update_token(symbol, exchange, token)
+
+            try:
+                candles, daily_candles = self._fetch_primary_and_daily_candles(
+                    exchange=exchange,
+                    tradingsymbol=resolved_symbol,
+                    symboltoken=token,
+                    interval=normalized_interval,
+                    daily_days=max(daily_days, 365),
+                    dataset_mode=True,
+                )
+            except Exception:
+                continue
+
+            if len(candles) < _minimum_candles_for_interval(normalized_interval):
+                continue
+
+            dataset.append(
+                {
+                    'symbol': resolved_symbol,
+                    'exchange': exchange,
+                    'sector': item.sector,
+                    'source': item.source,
+                    'symbol_token': token,
+                    'interval': normalized_interval,
+                    'candles': _pack_candles(candles[-240:]),
+                    'daily_candles': _pack_candles(daily_candles[-max(daily_days, 260):]),
+                }
+            )
+
+        self._dataset_cache[cache_key] = (datetime.utcnow(), dataset, None)
+        return dataset, None
+
+    def _fetch_primary_and_daily_candles(
+        self,
+        exchange: str,
+        tradingsymbol: str,
+        symboltoken: str,
+        interval: str,
+        daily_days: int,
+        dataset_mode: bool = False,
+    ) -> tuple[list[dict], list[dict]]:
+        normalized_interval = _normalize_interval(interval)
+
+        if normalized_interval in {'ONE_WEEK', 'ONE_MONTH'}:
+            daily_source = self.angel_client.fetch_candles(
+                exchange,
+                tradingsymbol,
+                symboltoken,
+                days=_daily_source_days_for_interval(normalized_interval, daily_days),
+                interval='ONE_DAY',
+            )
+            mode = 'week' if normalized_interval == 'ONE_WEEK' else 'month'
+            primary = _aggregate_candles(daily_source, mode)
+            return primary, daily_source
+
+        primary = self.angel_client.fetch_candles(
+            exchange,
+            tradingsymbol,
+            symboltoken,
+            days=_source_days_for_interval(normalized_interval, dataset_mode=dataset_mode),
+            interval=normalized_interval,
+        )
+
+        if normalized_interval == 'ONE_DAY':
+            daily_source = primary[-max(daily_days, 260):]
+        else:
+            daily_source = self.angel_client.fetch_candles(
+                exchange,
+                tradingsymbol,
+                symboltoken,
+                days=max(daily_days + 40, 365),
+                interval='ONE_DAY',
+            )
+        return primary, daily_source
 
     def scan_supertrend(self, force_refresh: bool = False) -> tuple[list[SupertrendHit], str | None]:
         market, error = self._load_market_data(force_refresh=force_refresh)
@@ -250,18 +370,30 @@ class StrategyService:
         macd_slow: int = 26,
         macd_signal: int = 9,
     ) -> tuple[dict[str, dict], str | None]:
+        normalized_interval = _normalize_interval(interval)
+        cache_key = ':'.join(
+            [
+                normalized_interval,
+                'wm' if use_weekly_monthly else 'no-wm',
+                f'vol{volume_multiplier:.2f}',
+                f'mf{macd_fast}',
+                f'ms{macd_slow}',
+                f'msig{macd_signal}',
+            ]
+        )
+
         if not force_refresh:
-            if self._market_cache_at and datetime.utcnow() - self._market_cache_at < self.cache_ttl:
-                return self._market_cache, self._market_cache_error
-            if self._market_cache_at is None:
+            cached = self._market_cache.get(cache_key)
+            if cached and datetime.utcnow() - cached[0] < self.cache_ttl:
+                return cached[1], cached[2]
+            if cached is None:
                 return {}, 'No cached scan yet. Use force refresh to run the first scan.'
 
         ok, msg = self.angel_client.ensure_connected()
         if not ok:
-            self._market_cache = {}
-            self._market_cache_error = f'Angel session unavailable: {msg}'
-            self._market_cache_at = datetime.utcnow()
-            return self._market_cache, self._market_cache_error
+            error = f'Angel session unavailable: {msg}'
+            self._market_cache[cache_key] = (datetime.utcnow(), {}, error)
+            return {}, error
 
         out: dict[str, dict] = {}
         for item in self.watchlist_service.enabled_items():
@@ -280,12 +412,18 @@ class StrategyService:
                 self.watchlist_service.update_token(symbol, exchange, token)
 
             try:
-                days = 120 if interval in {'FIVE_MINUTE', 'FIFTEEN_MINUTE'} else 365
-                candles = self.angel_client.fetch_candles(exchange, resolved_symbol, token, days=days, interval=interval)
+                candles, daily_candles = self._fetch_primary_and_daily_candles(
+                    exchange=exchange,
+                    tradingsymbol=resolved_symbol,
+                    symboltoken=token,
+                    interval=normalized_interval,
+                    daily_days=730 if use_weekly_monthly or normalized_interval in {'ONE_WEEK', 'ONE_MONTH'} else 365,
+                    dataset_mode=False,
+                )
             except Exception:
                 continue
 
-            if len(candles) < 120:
+            if len(candles) < _minimum_candles_for_interval(normalized_interval):
                 continue
 
             highs = [float(c['high']) for c in candles]
@@ -293,12 +431,11 @@ class StrategyService:
             closes = [float(c['close']) for c in candles]
             volumes = [float(c.get('volume', 0.0)) for c in candles]
 
-            if len(closes) < 120:
+            if len(closes) < _minimum_candles_for_interval(normalized_interval):
                 continue
 
             daily_rsi = _rsi_series(closes)
             if use_weekly_monthly:
-                daily_candles = self.angel_client.fetch_candles(exchange, resolved_symbol, token, days=730, interval='ONE_DAY')
                 weekly_rsi = _rsi_series(_aggregate_last_close(daily_candles, 'week'))
                 monthly_rsi = _rsi_series(_aggregate_last_close(daily_candles, 'month'))
             else:
@@ -366,13 +503,11 @@ class StrategyService:
                 'macd': macd_line[-1] if macd_line else 0.0,
                 'macd_signal': macd_sig[-1] if macd_sig else 0.0,
                 'macd_hist': macd_hist[-1] if macd_hist else 0.0,
-                'interval': interval,
+                'interval': normalized_interval,
                 'sparkline': _sparkline_points(closes[-40:]),
             }
 
-        self._market_cache = out
-        self._market_cache_error = None
-        self._market_cache_at = datetime.utcnow()
+        self._market_cache[cache_key] = (datetime.utcnow(), out, None)
         return out, None
 
 
@@ -490,6 +625,91 @@ def _signal_rank(signal: str) -> int:
     return order.get(signal, 0)
 
 
+def _normalize_interval(interval: str) -> str:
+    normalized = (interval or 'ONE_DAY').strip().upper()
+    aliases = {
+        'WEEKLY': 'ONE_WEEK',
+        'MONTHLY': 'ONE_MONTH',
+    }
+    return aliases.get(normalized, normalized)
+
+
+def _minimum_candles_for_interval(interval: str) -> int:
+    normalized = _normalize_interval(interval)
+    mapping = {
+        'FIVE_MINUTE': 120,
+        'FIFTEEN_MINUTE': 120,
+        'ONE_HOUR': 120,
+        'ONE_DAY': 120,
+        'ONE_WEEK': 52,
+        'ONE_MONTH': 24,
+    }
+    return mapping.get(normalized, 120)
+
+
+def _source_days_for_interval(interval: str, dataset_mode: bool = False) -> int:
+    normalized = _normalize_interval(interval)
+    if dataset_mode:
+        mapping = {
+            'FIVE_MINUTE': 35,
+            'FIFTEEN_MINUTE': 75,
+            'ONE_HOUR': 180,
+            'ONE_DAY': 420,
+        }
+    else:
+        mapping = {
+            'FIVE_MINUTE': 120,
+            'FIFTEEN_MINUTE': 120,
+            'ONE_HOUR': 365,
+            'ONE_DAY': 730,
+        }
+    return mapping.get(normalized, 365)
+
+
+def _daily_source_days_for_interval(interval: str, daily_days: int) -> int:
+    normalized = _normalize_interval(interval)
+    if normalized == 'ONE_WEEK':
+        return max(daily_days, 1500)
+    if normalized == 'ONE_MONTH':
+        return max(daily_days, 2200)
+    return max(daily_days, 365)
+
+
+def _aggregate_candles(candles: list[dict], mode: str) -> list[dict]:
+    buckets: dict[str, dict] = {}
+    order: list[str] = []
+    for candle in candles:
+        dt = _parse_ts(str(candle.get('ts', '')))
+        if dt is None:
+            continue
+        if mode == 'week':
+            iso = dt.isocalendar()
+            key = f'{iso.year}-W{iso.week:02d}'
+        else:
+            key = f'{dt.year}-{dt.month:02d}'
+
+        row = buckets.get(key)
+        if row is None:
+            row = {
+                'ts': key,
+                'open': float(candle.get('open', 0.0)),
+                'high': float(candle.get('high', 0.0)),
+                'low': float(candle.get('low', 0.0)),
+                'close': float(candle.get('close', 0.0)),
+                'volume': float(candle.get('volume', 0.0)),
+            }
+            buckets[key] = row
+            order.append(key)
+            continue
+
+        row['high'] = max(float(row['high']), float(candle.get('high', 0.0)))
+        row['low'] = min(float(row['low']), float(candle.get('low', 0.0)))
+        row['close'] = float(candle.get('close', 0.0))
+        row['volume'] = float(row['volume']) + float(candle.get('volume', 0.0))
+
+    return [buckets[key] for key in order]
+
+
 def _aggregate_last_close(candles: list[dict], mode: str) -> list[float]:
     buckets: dict[str, float] = {}
     for c in candles:
@@ -513,6 +733,22 @@ def _parse_ts(ts: str) -> datetime | None:
         except ValueError:
             continue
     return None
+
+
+def _pack_candles(candles: list[dict]) -> list[list[float | str]]:
+    packed: list[list[float | str]] = []
+    for candle in candles:
+        packed.append(
+            [
+                str(candle.get('ts', '')),
+                round(float(candle.get('open', 0.0)), 4),
+                round(float(candle.get('high', 0.0)), 4),
+                round(float(candle.get('low', 0.0)), 4),
+                round(float(candle.get('close', 0.0)), 4),
+                round(float(candle.get('volume', 0.0)), 2),
+            ]
+        )
+    return packed
 
 
 def _sparkline_points(values: list[float]) -> str:

@@ -7,3 +7,8 @@ defaults.yaml
 autotrader.db
 __pycache__/
 *.pyc
+
+# Expo / web client artifacts
+client/.expo/
+client/dist/
+client/web-build/

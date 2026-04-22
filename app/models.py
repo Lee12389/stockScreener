@@ -87,7 +87,7 @@ class ScannerConfigRequest(BaseModel):
     include_nifty50: bool = True
     include_midcap150: bool = True
     include_nifty500: bool = True
-    scan_interval: str = 'FIFTEEN_MINUTE'
+    scan_interval: Literal['FIVE_MINUTE', 'FIFTEEN_MINUTE', 'ONE_HOUR', 'ONE_DAY', 'ONE_WEEK', 'ONE_MONTH'] = 'FIFTEEN_MINUTE'
     use_weekly_monthly: bool = False
     volume_multiplier: float = Field(default=1.5, ge=0.5, le=5.0)
     macd_fast: int = Field(default=12, ge=2, le=200)
@@ -106,6 +106,22 @@ class BoughtAddRequest(BaseModel):
     entry_price: float = Field(ge=0.0)
     quantity: int = Field(default=1, ge=1)
     note: str = ''
+
+
+class WatchlistAddRequest(BaseModel):
+    symbol: str
+    exchange: str = 'NSE'
+    symbol_token: str = ''
+    sector: str = 'Custom'
+
+
+class WatchlistSymbolRequest(BaseModel):
+    symbol: str
+
+
+class WatchlistToggleRequest(BaseModel):
+    symbol: str
+    enabled: bool
 
 
 class OptionsLabRequest(BaseModel):

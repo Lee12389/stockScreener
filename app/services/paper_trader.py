@@ -32,6 +32,7 @@ class PaperTraderService:
         return self.summary()
 
     def summary(self) -> dict:
+        auto_jobs = self.scheduler.get_jobs()
         with SessionLocal() as session:
             account = session.get(PaperAccount, 1)
             if account is None:
@@ -70,6 +71,8 @@ class PaperTraderService:
                 'equity': round(equity, 2),
                 'realized_pnl': round(account.realized_pnl, 2),
                 'total_pnl': round(total_pnl, 2),
+                'auto_running': any(job.id == 'paper_auto' for job in auto_jobs),
+                'auto_jobs': [job.id for job in auto_jobs],
                 'positions': pos_rows,
                 'trades': [
                     {

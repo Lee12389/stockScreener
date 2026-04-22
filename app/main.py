@@ -22,6 +22,9 @@ from app.models import (
     TournamentRunRequest,
     TournamentStartRequest,
     TradeRequest,
+    WatchlistAddRequest,
+    WatchlistSymbolRequest,
+    WatchlistToggleRequest,
 )
 from app.services.analysis import AnalysisService
 from app.services.angel_client import AngelClient
@@ -78,6 +81,46 @@ def health() -> dict:
 def connect_session() -> SessionStatus:
     ok, msg = angel_client.connect()
     return SessionStatus(connected=ok, message=msg)
+
+
+@app.get('/api/trade/mode')
+def get_trade_mode() -> dict:
+    with SessionLocal() as session:
+        mode = get_state(session, 'trade_mode', settings.default_mode)
+    return {'mode': mode, 'allow_live': settings.allow_live_trades}
+
+
+@app.get('/api/dashboard/summary')
+def api_dashboard_summary(refresh: bool = Query(default=False)) -> dict:
+    performers = []
+    suggestions = []
+    info_message = 'Data not refreshed yet. Click refresh to fetch latest broker data.'
+
+    if refresh:
+        ok, msg = angel_client.ensure_connected()
+        if ok:
+            watch_symbols = [row.symbol for row in watchlist_service.enabled_items()]
+            performers_models = analysis_service.top_performers_from_symbols(watch_symbols)
+            bundle = analysis_service.suggestions(performers_models)
+            performers = [p.model_dump() for p in performers_models]
+            suggestions = [s.model_dump() for s in bundle.suggestions]
+            info_message = f'Dashboard refreshed for {len(watch_symbols)} symbols.'
+        else:
+            info_message = f'Unable to refresh dashboard: {msg}'
+
+    with SessionLocal() as session:
+        mode = get_state(session, 'trade_mode', settings.default_mode)
+
+    return {
+        'app_name': settings.app_name,
+        'connected': angel_client.is_connected(),
+        'mode': mode,
+        'allow_live': settings.allow_live_trades,
+        'watchlist_count': len(watchlist_service.enabled_items()),
+        'performers': performers,
+        'suggestions': suggestions,
+        'info_message': info_message,
+    }
 
 
 @app.get('/api/analysis/top-performers')
@@ -220,6 +263,15 @@ def api_scanner_config_update(req: ScannerConfigRequest) -> dict:
     return scanner_service.update_config(payload)
 
 
+@app.get('/api/scanner/dataset')
+def api_scanner_dataset(
+    refresh: bool = Query(default=False),
+    symbols: str = Query(default=''),
+) -> dict:
+    shortlist = [s.strip().upper() for s in symbols.split(',') if s.strip()]
+    return scanner_service.get_dataset(force_refresh=refresh, symbols=shortlist or None)
+
+
 @app.get('/api/scanner/scan')
 def api_scanner_scan(refresh: bool = Query(default=False)) -> dict:
     return scanner_service.scan(force_refresh=refresh)
@@ -284,6 +336,35 @@ def api_watchlist() -> list[dict]:
         }
         for r in rows
     ]
+
+
+@app.post('/api/watchlist/add')
+def api_watchlist_add(req: WatchlistAddRequest) -> dict:
+    ok = watchlist_service.add_symbol(
+        symbol=req.symbol,
+        exchange=req.exchange,
+        symbol_token=req.symbol_token or None,
+        sector=req.sector,
+    )
+    return {'ok': ok, 'items': api_watchlist()}
+
+
+@app.post('/api/watchlist/remove')
+def api_watchlist_remove(req: WatchlistSymbolRequest) -> dict:
+    ok = watchlist_service.remove_symbol(req.symbol)
+    return {'ok': ok, 'items': api_watchlist()}
+
+
+@app.post('/api/watchlist/toggle')
+def api_watchlist_toggle(req: WatchlistToggleRequest) -> dict:
+    ok = watchlist_service.set_enabled(req.symbol, req.enabled)
+    return {'ok': ok, 'items': api_watchlist()}
+
+
+@app.post('/api/watchlist/seed-defaults')
+def api_watchlist_seed_defaults(force: bool = Query(default=True)) -> dict:
+    inserted = watchlist_service.seed_sector_defaults(force=force)
+    return {'ok': True, 'inserted': inserted, 'items': api_watchlist()}
 
 
 @app.get('/api/strategies/scan')
@@ -392,25 +473,38 @@ def tournament_page(request: Request):
 
 
 @app.get('/scanner', response_class=HTMLResponse)
-def scanner_page(request: Request, refresh: bool = Query(default=False)):
-    result = scanner_service.scan(force_refresh=refresh)
+def scanner_page(
+    request: Request,
+    refresh: bool = Query(default=False),
+    symbols: str = Query(default=''),
+):
     cfg = scanner_service.get_config()
+    shortlist = [s.strip().upper() for s in symbols.split(',') if s.strip()]
     return templates.TemplateResponse(
         request=request,
         name='scanner.html',
-        context={'app_name': settings.app_name, 'result': result, 'config': cfg},
+        context={
+            'app_name': settings.app_name,
+            'config': cfg,
+            'initial_refresh': refresh,
+            'initial_symbols': shortlist,
+        },
     )
 
 
 @app.post('/scanner/shortlist', response_class=HTMLResponse)
 def scanner_shortlist_page(request: Request, symbols: str = Form(...), refresh: bool = Form(default=True)):
     shortlist = [s.strip().upper() for s in symbols.split(',') if s.strip()]
-    result = scanner_service.scan_shortlist(shortlist, force_refresh=refresh)
     cfg = scanner_service.get_config()
     return templates.TemplateResponse(
         request=request,
         name='scanner.html',
-        context={'app_name': settings.app_name, 'result': result, 'config': cfg},
+        context={
+            'app_name': settings.app_name,
+            'config': cfg,
+            'initial_refresh': refresh,
+            'initial_symbols': shortlist,
+        },
     )
 
 

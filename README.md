@@ -1,6 +1,6 @@
 ﻿# Angel One AutoTrader
 
-Extensible FastAPI app for strategy scanning, paper trading, and future live automation.
+Extensible FastAPI backend plus a shared Expo Router client for strategy scanning, paper trading, and future live automation across web, Android, and iOS.
 
 ## Highlights
 
@@ -12,6 +12,12 @@ Extensible FastAPI app for strategy scanning, paper trading, and future live aut
   - Merged strategy mode (RSI + Supertrend)
   - filters, lightweight sparklines, and cached fast rendering
 - Watchlist page with sector default seeds (top 10 per sector starter set).
+- Smart scanner page with:
+  - backend raw candle fetch + frontend indicator/scanner math
+  - TradingView-style indicator toggles and column controls
+  - daily, weekly, and monthly setup hunting
+  - expanded local charts with EMA, VWAP, Bollinger, Supertrend, RSI, stochastic, MACD, and volume
+  - practical presets like momentum breakout, trend pullback, VWAP reclaim, relative strength, squeeze, support bounce, and reversal sell
 - Paper trading system:
   - configurable paper capital
   - manual paper trade by symbol and strategy
@@ -39,6 +45,56 @@ Extensible FastAPI app for strategy scanning, paper trading, and future live aut
 ```bash
 bash ./scripts/run_linux.sh
 ```
+
+## Run Cross-Platform Client
+
+The `client/` app is a shared Expo Router frontend that targets web, Android, and iOS from one codebase.
+
+Windows:
+
+```powershell
+./scripts/run_client_windows.ps1 -Target web
+./scripts/run_client_windows.ps1 -Target android
+./scripts/run_client_windows.ps1 -Target ios
+```
+
+Linux/macOS:
+
+```bash
+bash ./scripts/run_client_linux.sh web
+bash ./scripts/run_client_linux.sh android
+bash ./scripts/run_client_linux.sh ios
+```
+
+You can also work directly inside `client/` with:
+
+```bash
+npm run web
+npm run android
+npm run ios
+```
+
+Set `EXPO_PUBLIC_API_BASE_URL` or update the in-app Settings screen if the client needs to reach a different backend host than the default local machine target.
+
+## Cleanup / Maintenance
+
+Use the cleanup helpers to prune stale SQLite rows, temporary caches, and old compiled files from the repo.
+
+Windows:
+
+```powershell
+./scripts/cleanup_windows.ps1
+./scripts/cleanup_windows.ps1 --dry-run
+```
+
+Linux/macOS:
+
+```bash
+bash ./scripts/cleanup_linux.sh
+bash ./scripts/cleanup_linux.sh --dry-run
+```
+
+The cleanup tool uses Python's built-in `sqlite3` module and supports retention flags such as `--scan-cache-days`, `--analysis-days`, `--paper-trade-days`, and `--bot-trade-days`.
 
 ## Main Pages
 
@@ -71,28 +127,31 @@ bash ./scripts/run_linux.sh
 
 - Backend responsibility:
   - broker connection/session
-  - candle/option chain fetch
-  - indicator/risk/business calculations
-  - filtering/ranking/scoring
+  - candle/option chain fetch and durable SQLite state
+  - risk/business calculations and trade execution
   - paper-trade execution and ledger
 - Frontend responsibility:
+  - scanner indicator math, ranking, filtering, and shortlist generation after raw fetch
   - charts/graphs/payoff visuals
-  - interactive strategy building UX
+  - interactive strategy building UX and chart toggles
   - high-frequency UI updates and device-specific optimizations
 
 ## Multi-Platform Plan (Web + Android + iOS)
 
-- Recommended stack:
-  - Web: React + Vite + TypeScript
-  - Mobile: React Native (Expo) reusing the same API contracts
-  - Charts: TradingView Lightweight Charts / ECharts (frontend render)
-- Current backend already supports this with REST endpoints.
-- CORS is enabled (`CORS_ORIGINS`) so separate frontend apps can connect.
+- Shared Expo Router app now lives in `client/`.
+- The same client codebase serves:
+  - web via Expo web export/dev server
+  - Android via Expo/Android tooling
+  - iOS via Expo/iOS tooling
+- CORS is enabled (`CORS_ORIGINS`) so the Expo web client can connect to the backend.
+- The in-app Settings screen lets phones point to the laptop LAN IP when you run the backend locally.
 
 ## Notes
 
 - First full fresh scan can take time depending on watchlist size.
-- After first scan, cached data returns quickly unless `refresh=true` is used.
+- After the scanner dataset is fetched, the browser handles filters, scores, scan presets, and chart rendering locally.
+- The Expo client also keeps scanner ranking/filtering logic on-device after the raw dataset fetch.
+- Weekly and monthly scanner intervals are available for longer-term swing and position scans.
 - Live trading stays disabled unless explicitly enabled with env + mode switch.
 
 

@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-<main class="container scanner-page">
+<main class="container scanner-shell">
     <header class="topbar">
         <h1>Smart Scanner</h1>
         <nav>
@@ -22,266 +22,370 @@
         </nav>
     </header>
 
-    <section class="card">
-        <h2>Configuration</h2>
-        <form action="/scanner/config" method="post" class="inline-form">
-            <label><input type="checkbox" name="include_nifty50" value="true" {% if config.include_nifty50 == 'true' %}checked{% endif %}/> Nifty 50</label>
-            <label><input type="checkbox" name="include_midcap150" value="true" {% if config.include_midcap150 == 'true' %}checked{% endif %}/> Midcap 150</label>
-            <label><input type="checkbox" name="include_nifty500" value="true" {% if config.include_nifty500 == 'true' %}checked{% endif %}/> Nifty 500 (toggle)</label>
-            <label>Interval
-                <select name="scan_interval">
-                    <option value="FIVE_MINUTE" {% if config.scan_interval == 'FIVE_MINUTE' %}selected{% endif %}>5m</option>
-                    <option value="FIFTEEN_MINUTE" {% if config.scan_interval == 'FIFTEEN_MINUTE' %}selected{% endif %}>15m</option>
-                    <option value="ONE_HOUR" {% if config.scan_interval == 'ONE_HOUR' %}selected{% endif %}>1h</option>
-                    <option value="ONE_DAY" {% if config.scan_interval == 'ONE_DAY' %}selected{% endif %}>1d</option>
-                </select>
-            </label>
-            <label><input type="checkbox" name="use_weekly_monthly" value="true" {% if config.use_weekly_monthly == 'true' %}checked{% endif %}/> Use weekly/monthly RSI</label>
-            <label>Volume x
-                <input type="number" step="0.1" min="0.5" max="5" name="volume_multiplier" value="{{ config.volume_multiplier }}" />
-            </label>
-            <label>MACD Fast <input type="number" name="macd_fast" value="{{ config.macd_fast }}" min="2" max="200" /></label>
-            <label>MACD Slow <input type="number" name="macd_slow" value="{{ config.macd_slow }}" min="3" max="300" /></label>
-            <label>MACD Signal <input type="number" name="macd_signal" value="{{ config.macd_signal }}" min="2" max="200" /></label>
-            <label><input type="checkbox" name="show_ema" value="true" {% if config.show_ema == 'true' %}checked{% endif %}/> EMA</label>
-            <label><input type="checkbox" name="show_rsi" value="true" {% if config.show_rsi == 'true' %}checked{% endif %}/> RSI</label>
-            <label><input type="checkbox" name="show_macd" value="true" {% if config.show_macd == 'true' %}checked{% endif %}/> MACD</label>
-            <label><input type="checkbox" name="show_supertrend" value="true" {% if config.show_supertrend == 'true' %}checked{% endif %}/> Supertrend</label>
-            <label><input type="checkbox" name="show_volume" value="true" {% if config.show_volume == 'true' %}checked{% endif %}/> Volume</label>
-            <label><input type="checkbox" name="show_sr" value="true" {% if config.show_sr == 'true' %}checked{% endif %}/> S/R</label>
-            <button type="submit">Save Config</button>
-            <a href="/scanner?refresh=true"><button type="button">Run Fresh Scan</button></a>
-        </form>
-
-        <form action="/scanner/shortlist" method="post" class="inline-form mt8">
-            <input type="hidden" name="refresh" value="true" />
-            <input type="hidden" name="symbols" value="{% for h in result.hits %}{{ h.symbol }}{% if not loop.last %},{% endif %}{% endfor %}" />
-            <button type="submit">Run On Current Shortlist Only</button>
-        </form>
+    <section class="card scanner-hero">
+        <div>
+            <p class="eyebrow">Client-Side Screener</p>
+            <h2>Daily and long-term setup hunting with local indicator math</h2>
+            <p class="meta">
+                Raw candles are fetched from Angel One once. After that, indicators, scans, shortlist generation,
+                chart overlays, and expansion are computed in your browser so the workflow stays fast and easy to evolve.
+            </p>
+        </div>
+        <div class="scanner-hero-actions">
+            <button type="button" id="refresh-data-btn">Fetch Latest Data</button>
+            <button type="button" id="load-cached-btn" class="ghost-button">Load Cached Data</button>
+            <span id="scanner-status" class="status-chip">Ready</span>
+        </div>
     </section>
 
-    <section class="card">
-        <div class="scanner-topline">
-            <h2>Filtered Candidates (<span id="visible-count">{{ result.count }}</span>/<span id="total-count">{{ result.count }}</span>)</h2>
-            <details class="column-picker">
-                <summary>View Columns</summary>
-                <div class="column-grid" id="column-picker-grid">
-                    <label><input type="checkbox" data-col-toggle="symbol" checked /> Symbol</label>
-                    <label><input type="checkbox" data-col-toggle="signal" checked /> Signal</label>
-                    <label><input type="checkbox" data-col-toggle="score" checked /> Score</label>
-                    <label><input type="checkbox" data-col-toggle="change" checked /> % Change</label>
-                    <label><input type="checkbox" data-col-toggle="rsi" checked /> RSI</label>
-                    <label><input type="checkbox" data-col-toggle="ema" checked /> EMA 20/50/100/200</label>
-                    <label><input type="checkbox" data-col-toggle="sr" checked /> Support/Resistance</label>
-                    <label><input type="checkbox" data-col-toggle="macd" checked /> MACD</label>
-                    <label><input type="checkbox" data-col-toggle="super" checked /> Supertrend</label>
-                    <label><input type="checkbox" data-col-toggle="vol" checked /> Vol x</label>
-                    <label><input type="checkbox" data-col-toggle="reasons" checked /> Reasons</label>
-                    <label><input type="checkbox" data-col-toggle="trend" checked /> Trend</label>
-                    <label><input type="checkbox" data-col-toggle="buy" checked /> Add Bought</label>
+    <section class="scanner-layout">
+        <aside class="scanner-sidebar">
+            <section class="card scanner-card">
+                <div class="section-head">
+                    <h2>Data Scope</h2>
+                    <span class="meta">Broker fetch only</span>
                 </div>
-            </details>
-        </div>
+                <form id="scanner-config-form" class="scanner-form-grid">
+                    <label><input type="checkbox" name="include_nifty50" {% if config.include_nifty50 == 'true' %}checked{% endif %}/> Nifty 50</label>
+                    <label><input type="checkbox" name="include_midcap150" {% if config.include_midcap150 == 'true' %}checked{% endif %}/> Midcap 150</label>
+                    <label><input type="checkbox" name="include_nifty500" {% if config.include_nifty500 == 'true' %}checked{% endif %}/> Nifty 500 starter list</label>
+                    <label>Interval
+                        <select name="scan_interval">
+                            <option value="FIVE_MINUTE" {% if config.scan_interval == 'FIVE_MINUTE' %}selected{% endif %}>5m</option>
+                            <option value="FIFTEEN_MINUTE" {% if config.scan_interval == 'FIFTEEN_MINUTE' %}selected{% endif %}>15m</option>
+                            <option value="ONE_HOUR" {% if config.scan_interval == 'ONE_HOUR' %}selected{% endif %}>1h</option>
+                            <option value="ONE_DAY" {% if config.scan_interval == 'ONE_DAY' %}selected{% endif %}>1D</option>
+                            <option value="ONE_WEEK" {% if config.scan_interval == 'ONE_WEEK' %}selected{% endif %}>1W</option>
+                            <option value="ONE_MONTH" {% if config.scan_interval == 'ONE_MONTH' %}selected{% endif %}>1M</option>
+                        </select>
+                    </label>
+                    <label><input type="checkbox" name="use_weekly_monthly" {% if config.use_weekly_monthly == 'true' %}checked{% endif %}/> Use weekly/monthly RSI confirmation</label>
+                    <label>Volume multiplier
+                        <input type="number" step="0.1" min="0.5" max="5.0" name="volume_multiplier" value="{{ config.volume_multiplier }}" />
+                    </label>
+                    <label>MACD fast
+                        <input type="number" min="2" max="200" name="macd_fast" value="{{ config.macd_fast }}" />
+                    </label>
+                    <label>MACD slow
+                        <input type="number" min="3" max="300" name="macd_slow" value="{{ config.macd_slow }}" />
+                    </label>
+                    <label>MACD signal
+                        <input type="number" min="2" max="200" name="macd_signal" value="{{ config.macd_signal }}" />
+                    </label>
+                    <div class="scanner-action-row">
+                        <button type="submit">Save Config</button>
+                        <button type="button" id="refetch-visible-btn" class="ghost-button">Refetch Visible Only</button>
+                        <button type="button" id="reset-scope-btn" class="ghost-button">Reset Full Universe</button>
+                    </div>
+                </form>
+            </section>
 
-        {% if result.error %}<p class="warn">{{ result.error }}</p>{% endif %}
+            <section class="card scanner-card">
+                <div class="section-head">
+                    <h2>Scan Presets</h2>
+                    <span class="meta">Common daily, swing, and position scans</span>
+                </div>
+                <div id="preset-bar" class="scanner-chipbar">
+                    <button type="button" class="scan-chip is-active" data-preset="all">All</button>
+                    <button type="button" class="scan-chip" data-preset="quality_momentum">Quality Momentum</button>
+                    <button type="button" class="scan-chip" data-preset="momentum_breakout">Momentum Breakout</button>
+                    <button type="button" class="scan-chip" data-preset="trend_pullback">Trend Pullback</button>
+                    <button type="button" class="scan-chip" data-preset="relative_strength">RS Leaders</button>
+                    <button type="button" class="scan-chip" data-preset="vwap_reclaim">VWAP Reclaim</button>
+                    <button type="button" class="scan-chip" data-preset="supertrend_continuation">Supertrend</button>
+                    <button type="button" class="scan-chip" data-preset="volume_breakout">Volume Breakout</button>
+                    <button type="button" class="scan-chip" data-preset="squeeze_breakout">BB Squeeze</button>
+                    <button type="button" class="scan-chip" data-preset="support_bounce">Support Bounce</button>
+                    <button type="button" class="scan-chip" data-preset="mean_reversion">Mean Reversion</button>
+                    <button type="button" class="scan-chip" data-preset="reversal_sell">Reversal Sell</button>
+                </div>
+            </section>
 
-        <div class="scanner-filters inline-form">
-            <label>Symbol
-                <input type="text" id="filter-symbol" placeholder="e.g. TCS" />
-            </label>
-            <label>Signal
-                <select id="filter-signal">
-                    <option value="">All</option>
-                    <option value="BUY">BUY</option>
-                    <option value="WATCH">WATCH</option>
-                    <option value="IGNORE">IGNORE</option>
-                </select>
-            </label>
-            <label>Min Score
-                <input type="number" id="filter-score-min" step="0.01" placeholder="0.25" />
-            </label>
-            <label>Min % Change
-                <input type="number" id="filter-change-min" step="0.01" placeholder="-2" />
-            </label>
-            <label>Min RSI
-                <input type="number" id="filter-rsi-min" step="0.1" placeholder="50" />
-            </label>
-            <label>Min Vol x
-                <input type="number" id="filter-vol-min" step="0.1" placeholder="1.5" />
-            </label>
-            <label>Supertrend
-                <select id="filter-super">
-                    <option value="">All</option>
-                    <option value="STRONG_BUY">STRONG_BUY</option>
-                    <option value="BUY">BUY</option>
-                    <option value="SELL">SELL</option>
-                    <option value="STRONG_SELL">STRONG_SELL</option>
-                    <option value="HOLD">HOLD</option>
-                </select>
-            </label>
-            <button type="button" id="clear-filters">Clear Filters</button>
-        </div>
+            <section class="card scanner-card">
+                <div class="section-head">
+                    <h2>Filters</h2>
+                    <button type="button" id="clear-filters" class="ghost-button">Clear</button>
+                </div>
+                <div class="scanner-form-grid compact">
+                    <label>Symbol
+                        <input type="text" id="filter-symbol" placeholder="TCS, HDFC..." />
+                    </label>
+                    <label>Sector
+                        <select id="filter-sector">
+                            <option value="">All sectors</option>
+                        </select>
+                    </label>
+                    <label>Signal
+                        <select id="filter-signal">
+                            <option value="">All</option>
+                            <option value="STRONG_BUY">STRONG_BUY</option>
+                            <option value="BUY">BUY</option>
+                            <option value="WATCH">WATCH</option>
+                            <option value="SELL">SELL</option>
+                            <option value="STRONG_SELL">STRONG_SELL</option>
+                            <option value="IGNORE">IGNORE</option>
+                        </select>
+                    </label>
+                    <label>Bought status
+                        <select id="filter-bought">
+                            <option value="">All</option>
+                            <option value="bought">Bought only</option>
+                            <option value="not_bought">Not bought</option>
+                        </select>
+                    </label>
+                    <label>Trend
+                        <select id="filter-trend">
+                            <option value="">All</option>
+                            <option value="bullish">Bullish</option>
+                            <option value="bearish">Bearish</option>
+                            <option value="neutral">Neutral</option>
+                        </select>
+                    </label>
+                    <label>Min score
+                        <input type="number" id="filter-score-min" step="1" placeholder="55" />
+                    </label>
+                    <label>Min price
+                        <input type="number" id="filter-price-min" step="0.1" placeholder="100" />
+                    </label>
+                    <label>Max price
+                        <input type="number" id="filter-price-max" step="0.1" placeholder="2500" />
+                    </label>
+                    <label>Min % change
+                        <input type="number" id="filter-change-min" step="0.1" placeholder="-1" />
+                    </label>
+                    <label>Min daily RSI
+                        <input type="number" id="filter-rsi-min" step="0.1" placeholder="52" />
+                    </label>
+                    <label>Min weekly RSI
+                        <input type="number" id="filter-rsi-weekly-min" step="0.1" placeholder="50" />
+                    </label>
+                    <label>Min monthly RSI
+                        <input type="number" id="filter-rsi-monthly-min" step="0.1" placeholder="50" />
+                    </label>
+                    <label>Min volume ratio
+                        <input type="number" id="filter-vol-min" step="0.1" placeholder="1.3" />
+                    </label>
+                    <label>Min ADX
+                        <input type="number" id="filter-adx-min" step="0.1" placeholder="18" />
+                    </label>
+                    <label>Near level
+                        <select id="filter-level">
+                            <option value="">Any</option>
+                            <option value="breakout">Near breakout</option>
+                            <option value="support">Near support</option>
+                            <option value="52w_high">Near 52W high</option>
+                        </select>
+                    </label>
+                    <label>Sort by
+                        <select id="filter-sort">
+                            <option value="score_desc">Score</option>
+                            <option value="change_desc">% Change</option>
+                            <option value="volume_desc">Volume Ratio</option>
+                            <option value="rsi_desc">Daily RSI</option>
+                            <option value="weekly_rsi_desc">Weekly RSI</option>
+                            <option value="monthly_rsi_desc">Monthly RSI</option>
+                            <option value="adx_desc">ADX</option>
+                            <option value="symbol_asc">Symbol</option>
+                        </select>
+                    </label>
+                    <label>Row limit
+                        <input type="number" id="filter-limit" min="10" max="500" step="10" value="120" />
+                    </label>
+                </div>
+            </section>
 
-        <div class="table-wrap">
-            <table id="scanner-table" class="wide-table">
-                <thead>
-                    <tr>
-                        <th data-col="symbol">Symbol</th>
-                        <th data-col="signal">Signal</th>
-                        <th data-col="score">Score</th>
-                        <th data-col="change">%</th>
-                        <th data-col="rsi">RSI (D/W/M)</th>
-                        <th data-col="ema">EMA20/50/100/200</th>
-                        <th data-col="sr">S/R</th>
-                        <th data-col="macd">MACD</th>
-                        <th data-col="super">Super</th>
-                        <th data-col="vol">Vol x</th>
-                        <th data-col="reasons">Reasons</th>
-                        <th data-col="trend">Trend</th>
-                        <th data-col="buy">Add Bought</th>
-                    </tr>
-                </thead>
-                <tbody>
-                {% for h in result.hits %}
-                <tr class="scanner-row"
-                    data-symbol="{{ h.symbol }}"
-                    data-signal="{{ h.signal }}"
-                    data-score="{{ h.score }}"
-                    data-change="{{ h.change_pct }}"
-                    data-rsi="{{ h.daily_rsi }}"
-                    data-vol="{{ h.volume_ratio }}"
-                    data-super="{{ h.super_signal }}">
-                    <td data-col="symbol">{{ h.symbol }}</td>
-                    <td data-col="signal"><strong>{{ h.signal }}</strong></td>
-                    <td data-col="score">{{ h.score }}</td>
-                    <td data-col="change" class="{{ 'ok' if h.change_pct >= 0 else 'warn' }}">{{ h.change_pct }}</td>
-                    <td data-col="rsi">{{ h.daily_rsi }} / {{ h.weekly_rsi }} / {{ h.monthly_rsi }}</td>
-                    <td data-col="ema">{{ h.ema20 }} / {{ h.ema50 }} / {{ h.ema100 }} / {{ h.ema200 }}</td>
-                    <td data-col="sr">{{ h.support }} / {{ h.resistance }}</td>
-                    <td data-col="macd">{{ h.macd }} / {{ h.macd_signal }}</td>
-                    <td data-col="super">{{ h.super_signal }}</td>
-                    <td data-col="vol">{{ h.volume_ratio }}</td>
-                    <td data-col="reasons">{{ h.reasons|join(' | ') }}</td>
-                    <td data-col="trend">
-                        <svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none">
-                            <polyline points="{{ h.sparkline }}" fill="none" stroke="#1f6f78" stroke-width="1.5" />
-                        </svg>
-                    </td>
-                    <td data-col="buy">
-                        <form action="/scanner/bought/add" method="post" class="inline-form">
-                            <input type="hidden" name="symbol" value="{{ h.symbol }}" />
-                            <input type="number" step="0.1" name="entry_price" value="{{ h.resistance }}" style="width:90px" />
-                            <input type="number" name="quantity" value="1" style="width:70px" />
-                            <input type="text" name="note" placeholder="note" style="width:90px" />
-                            <button type="submit">Bought</button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        </div>
+            <section class="card scanner-card">
+                <div class="section-head">
+                    <h2>View Controls</h2>
+                    <span class="meta">TradingView-style column and indicator toggles</span>
+                </div>
+                <details class="column-picker" open>
+                    <summary>Table Columns</summary>
+                    <div id="column-picker-grid" class="column-grid">
+                        <label><input type="checkbox" data-col-toggle="symbol" checked /> Symbol</label>
+                        <label><input type="checkbox" data-col-toggle="sector" checked /> Sector</label>
+                        <label><input type="checkbox" data-col-toggle="signal" checked /> Signal</label>
+                        <label><input type="checkbox" data-col-toggle="score" checked /> Score</label>
+                        <label><input type="checkbox" data-col-toggle="price" checked /> Price</label>
+                        <label><input type="checkbox" data-col-toggle="change" checked /> % Change</label>
+                        <label><input type="checkbox" data-col-toggle="rsi" checked /> RSI D/W/M</label>
+                        <label><input type="checkbox" data-col-toggle="trend" checked /> Trend</label>
+                        <label><input type="checkbox" data-col-toggle="macd" checked /> MACD</label>
+                        <label><input type="checkbox" data-col-toggle="super" checked /> Supertrend</label>
+                        <label><input type="checkbox" data-col-toggle="adx" checked /> ADX / Stoch</label>
+                        <label><input type="checkbox" data-col-toggle="vol" checked /> Vol x</label>
+                        <label><input type="checkbox" data-col-toggle="sr" checked /> Support / Resistance</label>
+                        <label><input type="checkbox" data-col-toggle="scans" checked /> Matched Scans</label>
+                        <label><input type="checkbox" data-col-toggle="chart" checked /> Chart</label>
+                        <label><input type="checkbox" data-col-toggle="buy" checked /> Bought</label>
+                    </div>
+                </details>
+
+                <div class="indicator-defaults">
+                    <p class="meta">Default expanded-chart overlays</p>
+                    <div class="column-grid">
+                        <label><input type="checkbox" data-default-indicator="ema20" checked /> EMA20</label>
+                        <label><input type="checkbox" data-default-indicator="ema50" checked /> EMA50</label>
+                        <label><input type="checkbox" data-default-indicator="ema200" checked /> EMA200</label>
+                        <label><input type="checkbox" data-default-indicator="vwap" checked /> VWAP</label>
+                        <label><input type="checkbox" data-default-indicator="bollinger" checked /> Bollinger</label>
+                        <label><input type="checkbox" data-default-indicator="supertrend" checked /> Supertrend</label>
+                        <label><input type="checkbox" data-default-indicator="rsi" checked /> RSI</label>
+                        <label><input type="checkbox" data-default-indicator="stoch" /> Stochastic</label>
+                        <label><input type="checkbox" data-default-indicator="macd" checked /> MACD</label>
+                        <label><input type="checkbox" data-default-indicator="volume" checked /> Volume</label>
+                    </div>
+                </div>
+            </section>
+        </aside>
+
+        <section class="scanner-main">
+            <section id="scanner-metrics" class="scanner-metrics">
+                <article class="metric-card">
+                    <p class="metric-label">Universe</p>
+                    <p id="metric-universe" class="metric-value">0</p>
+                </article>
+                <article class="metric-card">
+                    <p class="metric-label">Visible</p>
+                    <p id="metric-visible" class="metric-value">0</p>
+                </article>
+                <article class="metric-card">
+                    <p class="metric-label">BUY / STRONG</p>
+                    <p id="metric-buys" class="metric-value">0</p>
+                </article>
+                <article class="metric-card">
+                    <p class="metric-label">WATCH</p>
+                    <p id="metric-watch" class="metric-value">0</p>
+                </article>
+                <article class="metric-card">
+                    <p class="metric-label">Sell Alerts</p>
+                    <p id="metric-sells" class="metric-value">0</p>
+                </article>
+                <article class="metric-card">
+                    <p class="metric-label">Avg Vol x</p>
+                    <p id="metric-volume" class="metric-value">0.0</p>
+                </article>
+            </section>
+
+            <section class="card scanner-card">
+                <div class="section-head">
+                    <div>
+                        <h2>Visible Setup List</h2>
+                        <p id="scanner-scope-label" class="meta">No dataset loaded yet.</p>
+                    </div>
+                    <div class="scanner-action-row">
+                        <button type="button" id="copy-visible-btn" class="ghost-button">Copy Visible Symbols</button>
+                        <button type="button" id="download-visible-btn" class="ghost-button">Download CSV</button>
+                    </div>
+                </div>
+
+                <div id="bought-summary" class="monitor-strip"></div>
+
+                <div class="table-wrap scanner-table-wrap">
+                    <table id="scanner-table" class="wide-table scanner-results-table">
+                        <thead>
+                            <tr>
+                                <th data-col="symbol">Symbol</th>
+                                <th data-col="sector">Sector</th>
+                                <th data-col="signal">Signal</th>
+                                <th data-col="score">Score</th>
+                                <th data-col="price">Price</th>
+                                <th data-col="change">% Change</th>
+                                <th data-col="rsi">RSI D/W/M</th>
+                                <th data-col="trend">Trend / EMA</th>
+                                <th data-col="macd">MACD</th>
+                                <th data-col="super">Supertrend</th>
+                                <th data-col="adx">ADX / Stoch</th>
+                                <th data-col="vol">Vol x</th>
+                                <th data-col="sr">Support / Resistance</th>
+                                <th data-col="scans">Matched Scans</th>
+                                <th data-col="chart">Expand</th>
+                                <th data-col="buy">Bought</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scanner-body"></tbody>
+                    </table>
+                </div>
+
+                <div id="empty-state" class="empty-state" hidden>
+                    <h3>No rows matched the current setup.</h3>
+                    <p class="meta">Relax a filter, switch presets, or fetch a fresh dataset.</p>
+                </div>
+            </section>
+        </section>
     </section>
 </main>
 
+<section id="chart-modal" class="chart-modal" hidden>
+    <div class="chart-backdrop" data-close="true"></div>
+    <div class="chart-sheet">
+        <header class="chart-head">
+            <div>
+                <p class="eyebrow">Expanded Chart</p>
+                <h2 id="chart-title">Symbol</h2>
+                <p id="chart-subtitle" class="meta">Indicators render locally after fetch.</p>
+            </div>
+            <div class="scanner-action-row">
+                <button type="button" class="ghost-button" data-close="true">Close</button>
+            </div>
+        </header>
+
+        <div class="chart-toolbar">
+            <div class="chart-timeframes">
+                <button type="button" class="scan-chip is-active" data-timeframe="primary">Primary</button>
+                <button type="button" class="scan-chip" data-timeframe="daily">Daily</button>
+                <button type="button" class="scan-chip" data-timeframe="weekly">Weekly</button>
+                <button type="button" class="scan-chip" data-timeframe="monthly">Monthly</button>
+            </div>
+            <div class="chart-indicator-bar">
+                <button type="button" class="scan-chip is-active" data-chart-indicator="ema20">EMA20</button>
+                <button type="button" class="scan-chip is-active" data-chart-indicator="ema50">EMA50</button>
+                <button type="button" class="scan-chip is-active" data-chart-indicator="ema200">EMA200</button>
+                <button type="button" class="scan-chip is-active" data-chart-indicator="vwap">VWAP</button>
+                <button type="button" class="scan-chip is-active" data-chart-indicator="bollinger">Bollinger</button>
+                <button type="button" class="scan-chip is-active" data-chart-indicator="supertrend">Supertrend</button>
+                <button type="button" class="scan-chip is-active" data-chart-indicator="rsi">RSI</button>
+                <button type="button" class="scan-chip" data-chart-indicator="stoch">Stoch</button>
+                <button type="button" class="scan-chip is-active" data-chart-indicator="macd">MACD</button>
+                <button type="button" class="scan-chip is-active" data-chart-indicator="volume">Volume</button>
+            </div>
+        </div>
+
+        <section id="chart-summary" class="chart-summary"></section>
+        <canvas id="expanded-chart" class="expanded-chart" aria-label="Expanded stock chart"></canvas>
+
+        <footer class="chart-footer">
+            <div>
+                <h3>Why this matters</h3>
+                <div id="chart-reasons" class="chart-reasons"></div>
+            </div>
+            <div class="chart-side-actions">
+                <form id="chart-bought-form" class="inline-form">
+                    <input type="hidden" name="symbol" id="chart-bought-symbol" />
+                    <label>Entry
+                        <input type="number" step="0.1" id="chart-entry-price" name="entry_price" />
+                    </label>
+                    <label>Qty
+                        <input type="number" min="1" value="1" id="chart-quantity" name="quantity" />
+                    </label>
+                    <label>Note
+                        <input type="text" id="chart-note" name="note" placeholder="swing, intraday..." />
+                    </label>
+                    <button type="submit">Add Bought</button>
+                </form>
+                <button type="button" id="chart-remove-bought" class="ghost-button">Remove Bought</button>
+            </div>
+        </footer>
+    </div>
+</section>
+
 <script>
-(function () {
-    const table = document.getElementById('scanner-table');
-    if (!table) return;
-
-    const rows = Array.from(table.querySelectorAll('tbody tr.scanner-row'));
-    const visibleCount = document.getElementById('visible-count');
-
-    const controls = {
-        symbol: document.getElementById('filter-symbol'),
-        signal: document.getElementById('filter-signal'),
-        scoreMin: document.getElementById('filter-score-min'),
-        changeMin: document.getElementById('filter-change-min'),
-        rsiMin: document.getElementById('filter-rsi-min'),
-        volMin: document.getElementById('filter-vol-min'),
-        superSig: document.getElementById('filter-super'),
-    };
-
-    function parseNum(v) {
-        const n = parseFloat(v);
-        return Number.isFinite(n) ? n : null;
-    }
-
-    function applyFilters() {
-        const symbolText = (controls.symbol.value || '').trim().toUpperCase();
-        const signal = (controls.signal.value || '').trim().toUpperCase();
-        const minScore = parseNum(controls.scoreMin.value);
-        const minChange = parseNum(controls.changeMin.value);
-        const minRsi = parseNum(controls.rsiMin.value);
-        const minVol = parseNum(controls.volMin.value);
-        const superSig = (controls.superSig.value || '').trim().toUpperCase();
-
-        let count = 0;
-        rows.forEach((row) => {
-            const symbol = (row.dataset.symbol || '').toUpperCase();
-            const rowSignal = (row.dataset.signal || '').toUpperCase();
-            const rowScore = parseNum(row.dataset.score);
-            const rowChange = parseNum(row.dataset.change);
-            const rowRsi = parseNum(row.dataset.rsi);
-            const rowVol = parseNum(row.dataset.vol);
-            const rowSuper = (row.dataset.super || '').toUpperCase();
-
-            let show = true;
-            if (symbolText && !symbol.includes(symbolText)) show = false;
-            if (signal && rowSignal !== signal) show = false;
-            if (superSig && rowSuper !== superSig) show = false;
-            if (minScore !== null && (rowScore === null || rowScore < minScore)) show = false;
-            if (minChange !== null && (rowChange === null || rowChange < minChange)) show = false;
-            if (minRsi !== null && (rowRsi === null || rowRsi < minRsi)) show = false;
-            if (minVol !== null && (rowVol === null || rowVol < minVol)) show = false;
-
-            row.style.display = show ? '' : 'none';
-            if (show) count += 1;
-        });
-        if (visibleCount) visibleCount.textContent = String(count);
-    }
-
-    Object.values(controls).forEach((el) => {
-        el.addEventListener('input', applyFilters);
-        el.addEventListener('change', applyFilters);
-    });
-
-    const clearBtn = document.getElementById('clear-filters');
-    if (clearBtn) {
-        clearBtn.addEventListener('click', () => {
-            Object.values(controls).forEach((el) => { el.value = ''; });
-            applyFilters();
-        });
-    }
-
-    function setColumnVisibility(col, visible) {
-        table.querySelectorAll('[data-col="' + col + '"]').forEach((cell) => {
-            cell.style.display = visible ? '' : 'none';
-        });
-    }
-
-    const defaults = {
-        ema: {{ 'true' if config.show_ema == 'true' else 'false' }},
-        rsi: {{ 'true' if config.show_rsi == 'true' else 'false' }},
-        macd: {{ 'true' if config.show_macd == 'true' else 'false' }},
-        super: {{ 'true' if config.show_supertrend == 'true' else 'false' }},
-        vol: {{ 'true' if config.show_volume == 'true' else 'false' }},
-        sr: {{ 'true' if config.show_sr == 'true' else 'false' }}
-    };
-
-    document.querySelectorAll('[data-col-toggle]').forEach((chk) => {
-        const col = chk.getAttribute('data-col-toggle');
-        if (Object.prototype.hasOwnProperty.call(defaults, col)) {
-            chk.checked = Boolean(defaults[col]);
-        }
-        setColumnVisibility(col, chk.checked);
-        chk.addEventListener('change', () => {
-            setColumnVisibility(col, chk.checked);
-        });
-    });
-
-    applyFilters();
-})();
+window.__SCANNER_BOOTSTRAP__ = {
+    config: {{ config | tojson }},
+    initialRefresh: {{ initial_refresh | tojson }},
+    initialSymbols: {{ initial_symbols | tojson }}
+};
 </script>
+<script src="/static/scanner.js"></script>
 </body>
 </html>
