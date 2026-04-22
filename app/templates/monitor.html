@@ -1,0 +1,58 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ app_name }} - Bought Monitor</title>
+    <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+<main class="container">
+    <header class="topbar">
+        <h1>Bought Monitor</h1>
+        <nav>
+            <a href="/">Dashboard</a>
+            <a href="/watchlist">Watchlist</a>
+            <a href="/strategies">Strategies</a>
+            <a href="/paper">Paper</a>
+            <a href="/tournament">Tournament</a>
+            <a href="/scanner">Scanner</a>
+            <a href="/monitor" class="active">Monitor</a>
+        </nav>
+    </header>
+
+    <section class="card">
+        <h2>Reversal Alerts ({{ monitor.count }})</h2>
+        {% if monitor.error %}<p class="warn">{{ monitor.error }}</p>{% endif %}
+        <a href="/monitor?refresh=true"><button type="button">Refresh Monitor</button></a>
+        <table>
+            <thead><tr><th>Symbol</th><th>Entry</th><th>LTP</th><th>PnL</th><th>State</th><th>Reasons</th><th>Graph</th><th>Action</th></tr></thead>
+            <tbody>
+            {% for m in monitor['items'] %}
+            <tr>
+                <td>{{ m.symbol }}</td>
+                <td>{{ m.entry_price }}</td>
+                <td>{{ m.ltp }}</td>
+                <td class="{{ 'ok' if m.pnl >= 0 else 'warn' }}">{{ m.pnl }}</td>
+                <td class="{{ 'danger-strong' if m.state == 'STRONG_SELL' else 'danger-weak' if m.state == 'WEAK_SELL' else '' }}"><strong>{{ m.state }}</strong></td>
+                <td>{{ m.reasons }}</td>
+                <td>
+                    <svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none">
+                        <polyline points="{{ m.sparkline }}" fill="none" stroke="#1f6f78" stroke-width="1.5" />
+                    </svg>
+                </td>
+                <td>
+                    <form action="/scanner/bought/remove" method="post">
+                        <input type="hidden" name="symbol" value="{{ m.symbol }}" />
+                        <button type="submit" class="danger">Remove</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+</main>
+</body>
+</html>
+

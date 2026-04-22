@@ -136,8 +136,25 @@ class StrategyService:
         )
         return hits, None
 
-    def get_market_snapshot(self, force_refresh: bool = False) -> tuple[dict[str, dict], str | None]:
-        return self._load_market_data(force_refresh=force_refresh)
+    def get_market_snapshot(
+        self,
+        force_refresh: bool = False,
+        interval: str = 'ONE_DAY',
+        use_weekly_monthly: bool = False,
+        volume_multiplier: float = 1.5,
+        macd_fast: int = 12,
+        macd_slow: int = 26,
+        macd_signal: int = 9,
+    ) -> tuple[dict[str, dict], str | None]:
+        return self._load_market_data(
+            force_refresh=force_refresh,
+            interval=interval,
+            use_weekly_monthly=use_weekly_monthly,
+            volume_multiplier=volume_multiplier,
+            macd_fast=macd_fast,
+            macd_slow=macd_slow,
+            macd_signal=macd_signal,
+        )
 
     def scan_supertrend(self, force_refresh: bool = False) -> tuple[list[SupertrendHit], str | None]:
         market, error = self._load_market_data(force_refresh=force_refresh)
@@ -223,7 +240,16 @@ class StrategyService:
         merged.sort(key=lambda x: (_signal_rank(x.signal), x.change_pct), reverse=True)
         return merged, None
 
-    def _load_market_data(self, force_refresh: bool = False) -> tuple[dict[str, dict], str | None]:
+    def _load_market_data(
+        self,
+        force_refresh: bool = False,
+        interval: str = 'ONE_DAY',
+        use_weekly_monthly: bool = False,
+        volume_multiplier: float = 1.5,
+        macd_fast: int = 12,
+        macd_slow: int = 26,
+        macd_signal: int = 9,
+    ) -> tuple[dict[str, dict], str | None]:
         if not force_refresh:
             if self._market_cache_at and datetime.utcnow() - self._market_cache_at < self.cache_ttl:
                 return self._market_cache, self._market_cache_error
@@ -254,7 +280,8 @@ class StrategyService:
                 self.watchlist_service.update_token(symbol, exchange, token)
 
             try:
-                candles = self.angel_client.fetch_candles(exchange, resolved_symbol, token, days=730)
+                days = 120 if interval in {'FIVE_MINUTE', 'FIFTEEN_MINUTE'} else 365
+                candles = self.angel_client.fetch_candles(exchange, resolved_symbol, token, days=days, interval=interval)
             except Exception:
                 continue
 
@@ -270,8 +297,13 @@ class StrategyService:
                 continue
 
             daily_rsi = _rsi_series(closes)
-            weekly_rsi = _rsi_series(_aggregate_last_close(candles, 'week'))
-            monthly_rsi = _rsi_series(_aggregate_last_close(candles, 'month'))
+            if use_weekly_monthly:
+                daily_candles = self.angel_client.fetch_candles(exchange, resolved_symbol, token, days=730, interval='ONE_DAY')
+                weekly_rsi = _rsi_series(_aggregate_last_close(daily_candles, 'week'))
+                monthly_rsi = _rsi_series(_aggregate_last_close(daily_candles, 'month'))
+            else:
+                weekly_rsi = [daily_rsi[-1]] if daily_rsi else []
+                monthly_rsi = [daily_rsi[-1]] if daily_rsi else []
             if len(daily_rsi) < 3 or not weekly_rsi or not monthly_rsi:
                 continue
 
@@ -281,12 +313,15 @@ class StrategyService:
             close_now = closes[-1]
             ema50 = _ema(closes, 50)[-1]
             ema20 = _ema(closes, 20)[-1]
+            ema100 = _ema(closes, 100)[-1]
+            ema200 = _ema(closes, 200)[-1]
+            macd_line, macd_sig, macd_hist = _macd(closes, fast=macd_fast, slow=macd_slow, signal=macd_signal)
             trend = 'UP' if close_now >= ema50 else 'DOWN'
             vol_ma20 = (sum(volumes[-20:]) / max(len(volumes[-20:]), 1)) if volumes else 0.0
             volume_ratio = (volumes[-1] / vol_ma20) if vol_ma20 > 0 else 1.0
             sr_nearest = min(abs(close_now - support), abs(resistance - close_now))
             sr_proximity = max(0.0, 1.0 - (sr_nearest / max(close_now * 0.02, 0.01)))
-            volume_weight = max(0.5, min(2.0, volume_ratio))
+            volume_weight = max(0.5, min(3.0, volume_ratio / max(volume_multiplier, 0.1)))
 
             if is_bullish and close_now >= resistance * 0.998:
                 super_signal = 'STRONG_BUY'
@@ -322,10 +357,16 @@ class StrategyService:
                 'close': close_now,
                 'ema20': ema20,
                 'ema50': ema50,
+                'ema100': ema100,
+                'ema200': ema200,
                 'trend': trend,
                 'volume_ratio': volume_ratio,
                 'volume_weight': volume_weight,
                 'sr_proximity': sr_proximity,
+                'macd': macd_line[-1] if macd_line else 0.0,
+                'macd_signal': macd_sig[-1] if macd_sig else 0.0,
+                'macd_hist': macd_hist[-1] if macd_hist else 0.0,
+                'interval': interval,
                 'sparkline': _sparkline_points(closes[-40:]),
             }
 
@@ -370,6 +411,17 @@ def _ema(values: list[float], period: int) -> list[float]:
     for v in values[1:]:
         out.append((v * alpha) + (out[-1] * (1 - alpha)))
     return out
+
+
+def _macd(values: list[float], fast: int = 12, slow: int = 26, signal: int = 9) -> tuple[list[float], list[float], list[float]]:
+    if not values:
+        return [], [], []
+    fast_ema = _ema(values, max(2, fast))
+    slow_ema = _ema(values, max(3, slow))
+    macd_line = [f - s for f, s in zip(fast_ema, slow_ema)]
+    macd_signal = _ema(macd_line, max(2, signal))
+    hist = [m - s for m, s in zip(macd_line, macd_signal)]
+    return macd_line, macd_signal, hist
 
 
 def _supertrend(highs: list[float], lows: list[float], closes: list[float], period: int = 10, multiplier: float = 3.0):

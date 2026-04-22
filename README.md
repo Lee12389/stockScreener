@@ -66,3 +66,7 @@ bash ./scripts/run_linux.sh
 - First full fresh scan can take time depending on watchlist size.
 - After first scan, cached data returns quickly unless `refresh=true` is used.
 - Live trading stays disabled unless explicitly enabled with env + mode switch.
+
+- /scanner smart multi-timeframe scanner with indicator toggles
+- /monitor bought stocks reversal monitor (weak/strong sell)
+

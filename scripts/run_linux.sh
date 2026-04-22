@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/env bash
 set -euo pipefail
 HOST=${1:-127.0.0.1}
-PORT=${2:-8000}
+PORT=${2:-5015}
 
 if [ ! -d ".venv" ]; then
   python3 -m venv .venv

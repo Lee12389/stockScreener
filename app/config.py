@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     app_name: str = Field(default='Angel One AutoTrader', alias='APP_NAME')
     app_env: str = Field(default='dev', alias='APP_ENV')
     host: str = Field(default='127.0.0.1', alias='HOST')
-    port: int = Field(default=8000, alias='PORT')
+    port: int = Field(default=5015, alias='PORT')
     secret_key: str = Field(default='change-me', alias='SECRET_KEY')
 
     allow_live_trades: bool = Field(default=False, alias='ALLOW_LIVE_TRADES')

@@ -92,6 +92,8 @@ select, input {
     background: linear-gradient(180deg, #f6faf9 0%, #ffffff 100%);
     border-radius: 4px;
 }
+.danger-weak { color: #c0392b; background: #fdecea; }
+.danger-strong { color: #7b1113; background: #f9d6d5; }
 .controls form, .mt8 {
     margin-bottom: 10px;
 }

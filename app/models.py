@@ -81,3 +81,28 @@ class TournamentStartRequest(BaseModel):
 
 class TournamentRunRequest(BaseModel):
     refresh_signals: bool = True
+
+
+class ScannerConfigRequest(BaseModel):
+    include_nifty50: bool = True
+    include_midcap150: bool = True
+    include_nifty500: bool = True
+    scan_interval: str = 'FIFTEEN_MINUTE'
+    use_weekly_monthly: bool = False
+    volume_multiplier: float = Field(default=1.5, ge=0.5, le=5.0)
+    macd_fast: int = Field(default=12, ge=2, le=200)
+    macd_slow: int = Field(default=26, ge=3, le=300)
+    macd_signal: int = Field(default=9, ge=2, le=200)
+    show_ema: bool = True
+    show_rsi: bool = True
+    show_macd: bool = True
+    show_supertrend: bool = True
+    show_volume: bool = True
+    show_sr: bool = True
+
+
+class BoughtAddRequest(BaseModel):
+    symbol: str
+    entry_price: float = Field(ge=0.0)
+    quantity: int = Field(default=1, ge=1)
+    note: str = ''

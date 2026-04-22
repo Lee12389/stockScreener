@@ -100,6 +100,7 @@ class AngelClient:
         tradingsymbol: str,
         symboltoken: str,
         days: int = 730,
+        interval: str = 'ONE_DAY',
     ) -> list[dict[str, float | str]]:
         to_dt = datetime.now()
         from_dt = to_dt - timedelta(days=days)
@@ -107,7 +108,7 @@ class AngelClient:
             'exchange': exchange,
             'tradingsymbol': tradingsymbol,
             'symboltoken': symboltoken,
-            'interval': 'ONE_DAY',
+            'interval': interval,
             'fromdate': from_dt.strftime('%Y-%m-%d %H:%M'),
             'todate': to_dt.strftime('%Y-%m-%d %H:%M'),
         }

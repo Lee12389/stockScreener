@@ -9,9 +9,11 @@ from app.config import get_settings
 from app.db import SessionLocal, get_state, init_db, set_state
 from app.models import (
     AutomationRequest,
+    BoughtAddRequest,
     PaperBotRequest,
     PaperFundRequest,
     PaperTradeRequest,
+    ScannerConfigRequest,
     SessionStatus,
     TournamentInitRequest,
     TournamentRunRequest,
@@ -26,6 +28,7 @@ from app.services.strategy_tournament import StrategyTournamentService
 from app.services.trade_engine import TradeEngine
 from app.services.watchlist import WatchlistService
 from app.services.paper_trader import PaperTraderService
+from app.services.smart_scanner import SmartScannerService
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name)
@@ -42,6 +45,7 @@ watchlist_service = WatchlistService()
 strategy_service = StrategyService(angel_client, watchlist_service)
 paper_trader = PaperTraderService(strategy_service)
 tournament_service = StrategyTournamentService(strategy_service)
+scanner_service = SmartScannerService(strategy_service, watchlist_service)
 
 
 @app.on_event('startup')
@@ -177,6 +181,58 @@ def api_tournament_leaderboard() -> dict:
     return tournament_service.leaderboard()
 
 
+@app.get('/api/scanner/config')
+def api_scanner_config() -> dict:
+    return scanner_service.get_config()
+
+
+@app.post('/api/scanner/config')
+def api_scanner_config_update(req: ScannerConfigRequest) -> dict:
+    payload = {
+        'include_nifty50': 'true' if req.include_nifty50 else 'false',
+        'include_midcap150': 'true' if req.include_midcap150 else 'false',
+        'include_nifty500': 'true' if req.include_nifty500 else 'false',
+        'scan_interval': req.scan_interval,
+        'use_weekly_monthly': 'true' if req.use_weekly_monthly else 'false',
+        'volume_multiplier': req.volume_multiplier,
+        'macd_fast': req.macd_fast,
+        'macd_slow': req.macd_slow,
+        'macd_signal': req.macd_signal,
+        'show_ema': 'true' if req.show_ema else 'false',
+        'show_rsi': 'true' if req.show_rsi else 'false',
+        'show_macd': 'true' if req.show_macd else 'false',
+        'show_supertrend': 'true' if req.show_supertrend else 'false',
+        'show_volume': 'true' if req.show_volume else 'false',
+        'show_sr': 'true' if req.show_sr else 'false',
+    }
+    return scanner_service.update_config(payload)
+
+
+@app.get('/api/scanner/scan')
+def api_scanner_scan(refresh: bool = Query(default=False)) -> dict:
+    return scanner_service.scan(force_refresh=refresh)
+
+
+@app.post('/api/scanner/bought/add')
+def api_scanner_bought_add(req: BoughtAddRequest) -> dict:
+    return scanner_service.add_bought(
+        symbol=req.symbol.strip().upper(),
+        entry_price=req.entry_price,
+        quantity=req.quantity,
+        note=req.note,
+    )
+
+
+@app.post('/api/scanner/bought/remove')
+def api_scanner_bought_remove(symbol: str = Form(...)) -> dict:
+    return scanner_service.remove_bought(symbol.strip().upper())
+
+
+@app.get('/api/scanner/bought/monitor')
+def api_scanner_bought_monitor(refresh: bool = Query(default=False)) -> dict:
+    return scanner_service.monitor_bought(force_refresh=refresh)
+
+
 @app.get('/api/watchlist')
 def api_watchlist() -> list[dict]:
     rows = watchlist_service.list_items()
@@ -298,6 +354,27 @@ def tournament_page(request: Request):
     )
 
 
+@app.get('/scanner', response_class=HTMLResponse)
+def scanner_page(request: Request, refresh: bool = Query(default=False)):
+    result = scanner_service.scan(force_refresh=refresh)
+    cfg = scanner_service.get_config()
+    return templates.TemplateResponse(
+        request=request,
+        name='scanner.html',
+        context={'app_name': settings.app_name, 'result': result, 'config': cfg},
+    )
+
+
+@app.get('/monitor', response_class=HTMLResponse)
+def monitor_page(request: Request, refresh: bool = Query(default=False)):
+    mon = scanner_service.monitor_bought(force_refresh=refresh)
+    return templates.TemplateResponse(
+        request=request,
+        name='monitor.html',
+        context={'app_name': settings.app_name, 'monitor': mon},
+    )
+
+
 @app.post('/paper/fund')
 def paper_fund(starting_cash: float = Form(...)):
     paper_trader.reset_account(starting_cash)
@@ -366,6 +443,58 @@ def tournament_start(interval_seconds: int = Form(60), refresh_signals: bool = F
 def tournament_stop():
     tournament_service.stop()
     return RedirectResponse('/tournament', status_code=303)
+
+
+@app.post('/scanner/config')
+def scanner_config_update(
+    include_nifty50: bool = Form(False),
+    include_midcap150: bool = Form(False),
+    include_nifty500: bool = Form(False),
+    scan_interval: str = Form('FIFTEEN_MINUTE'),
+    use_weekly_monthly: bool = Form(False),
+    volume_multiplier: float = Form(1.5),
+    macd_fast: int = Form(12),
+    macd_slow: int = Form(26),
+    macd_signal: int = Form(9),
+    show_ema: bool = Form(False),
+    show_rsi: bool = Form(False),
+    show_macd: bool = Form(False),
+    show_supertrend: bool = Form(False),
+    show_volume: bool = Form(False),
+    show_sr: bool = Form(False),
+):
+    scanner_service.update_config(
+        {
+            'include_nifty50': 'true' if include_nifty50 else 'false',
+            'include_midcap150': 'true' if include_midcap150 else 'false',
+            'include_nifty500': 'true' if include_nifty500 else 'false',
+            'scan_interval': scan_interval,
+            'use_weekly_monthly': 'true' if use_weekly_monthly else 'false',
+            'volume_multiplier': volume_multiplier,
+            'macd_fast': macd_fast,
+            'macd_slow': macd_slow,
+            'macd_signal': macd_signal,
+            'show_ema': 'true' if show_ema else 'false',
+            'show_rsi': 'true' if show_rsi else 'false',
+            'show_macd': 'true' if show_macd else 'false',
+            'show_supertrend': 'true' if show_supertrend else 'false',
+            'show_volume': 'true' if show_volume else 'false',
+            'show_sr': 'true' if show_sr else 'false',
+        }
+    )
+    return RedirectResponse('/scanner', status_code=303)
+
+
+@app.post('/scanner/bought/add')
+def scanner_bought_add(symbol: str = Form(...), entry_price: float = Form(...), quantity: int = Form(1), note: str = Form('')):
+    scanner_service.add_bought(symbol.strip().upper(), entry_price, quantity, note)
+    return RedirectResponse('/monitor', status_code=303)
+
+
+@app.post('/scanner/bought/remove')
+def scanner_bought_remove(symbol: str = Form(...)):
+    scanner_service.remove_bought(symbol.strip().upper())
+    return RedirectResponse('/monitor', status_code=303)
 
 
 @app.post('/watchlist/add')

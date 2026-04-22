@@ -153,6 +153,53 @@ class StrategyBotTrade(Base):
     signal_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
 
 
+class BoughtMonitor(Base):
+    __tablename__ = 'bought_monitor'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    symbol: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
+    exchange: Mapped[str] = mapped_column(String(16), nullable=False, default='NSE')
+    entry_price: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    note: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class ScannerConfig(Base):
+    __tablename__ = 'scanner_config'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    include_nifty50: Mapped[str] = mapped_column(String(5), nullable=False, default='true')
+    include_midcap150: Mapped[str] = mapped_column(String(5), nullable=False, default='true')
+    include_nifty500: Mapped[str] = mapped_column(String(5), nullable=False, default='true')
+    scan_interval: Mapped[str] = mapped_column(String(16), nullable=False, default='FIFTEEN_MINUTE')
+    use_weekly_monthly: Mapped[str] = mapped_column(String(5), nullable=False, default='false')
+    volume_multiplier: Mapped[float] = mapped_column(Float, nullable=False, default=1.5)
+    macd_fast: Mapped[int] = mapped_column(Integer, nullable=False, default=12)
+    macd_slow: Mapped[int] = mapped_column(Integer, nullable=False, default=26)
+    macd_signal: Mapped[int] = mapped_column(Integer, nullable=False, default=9)
+    show_ema: Mapped[str] = mapped_column(String(5), nullable=False, default='true')
+    show_rsi: Mapped[str] = mapped_column(String(5), nullable=False, default='true')
+    show_macd: Mapped[str] = mapped_column(String(5), nullable=False, default='true')
+    show_supertrend: Mapped[str] = mapped_column(String(5), nullable=False, default='true')
+    show_volume: Mapped[str] = mapped_column(String(5), nullable=False, default='true')
+    show_sr: Mapped[str] = mapped_column(String(5), nullable=False, default='true')
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class ScanResultCache(Base):
+    __tablename__ = 'scan_result_cache'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    symbol: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    timeframe: Mapped[str] = mapped_column(String(16), nullable=False)
+    config_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    candle_last_ts: Mapped[str] = mapped_column(String(40), nullable=False)
+    payload: Mapped[str] = mapped_column(String(8000), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
 _db_path = Path(__file__).resolve().parents[1] / 'autotrader.db'
 _engine = create_engine(f'sqlite:///{_db_path}', future=True)
 SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False, expire_on_commit=False)
@@ -208,6 +255,17 @@ def _ensure_paper_defaults() -> None:
                 text(
                     "INSERT INTO paper_account (id, starting_cash, cash_balance, realized_pnl, updated_at) "
                     "VALUES (1, 100000.0, 100000.0, 0.0, CURRENT_TIMESTAMP)"
+                )
+            )
+        sc = conn.execute(text("SELECT id FROM scanner_config WHERE id = 1")).fetchone()
+        if not sc:
+            conn.execute(
+                text(
+                    "INSERT INTO scanner_config (id, include_nifty50, include_midcap150, include_nifty500, scan_interval, "
+                    "use_weekly_monthly, volume_multiplier, macd_fast, macd_slow, macd_signal, "
+                    "show_ema, show_rsi, show_macd, show_supertrend, show_volume, show_sr, updated_at) "
+                    "VALUES (1,'true','true','true','FIFTEEN_MINUTE','false',1.5,12,26,9,"
+                    "'true','true','true','true','true','true',CURRENT_TIMESTAMP)"
                 )
             )
 

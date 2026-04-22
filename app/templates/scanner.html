@@ -1,0 +1,96 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ app_name }} - Scanner</title>
+    <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+<main class="container">
+    <header class="topbar">
+        <h1>Smart Scanner</h1>
+        <nav>
+            <a href="/">Dashboard</a>
+            <a href="/watchlist">Watchlist</a>
+            <a href="/strategies">Strategies</a>
+            <a href="/paper">Paper</a>
+            <a href="/tournament">Tournament</a>
+            <a href="/scanner" class="active">Scanner</a>
+            <a href="/monitor">Monitor</a>
+        </nav>
+    </header>
+
+    <section class="card">
+        <h2>Configuration</h2>
+        <form action="/scanner/config" method="post" class="inline-form">
+            <label><input type="checkbox" name="include_nifty50" value="true" {% if config.include_nifty50 == 'true' %}checked{% endif %}/> Nifty 50</label>
+            <label><input type="checkbox" name="include_midcap150" value="true" {% if config.include_midcap150 == 'true' %}checked{% endif %}/> Midcap 150</label>
+            <label><input type="checkbox" name="include_nifty500" value="true" {% if config.include_nifty500 == 'true' %}checked{% endif %}/> Nifty 500 (toggle)</label>
+            <label>Interval
+                <select name="scan_interval">
+                    <option value="FIVE_MINUTE" {% if config.scan_interval == 'FIVE_MINUTE' %}selected{% endif %}>5m</option>
+                    <option value="FIFTEEN_MINUTE" {% if config.scan_interval == 'FIFTEEN_MINUTE' %}selected{% endif %}>15m</option>
+                    <option value="ONE_HOUR" {% if config.scan_interval == 'ONE_HOUR' %}selected{% endif %}>1h</option>
+                    <option value="ONE_DAY" {% if config.scan_interval == 'ONE_DAY' %}selected{% endif %}>1d</option>
+                </select>
+            </label>
+            <label><input type="checkbox" name="use_weekly_monthly" value="true" {% if config.use_weekly_monthly == 'true' %}checked{% endif %}/> Use weekly/monthly RSI</label>
+            <label>Volume x
+                <input type="number" step="0.1" min="0.5" max="5" name="volume_multiplier" value="{{ config.volume_multiplier }}" />
+            </label>
+            <label>MACD Fast <input type="number" name="macd_fast" value="{{ config.macd_fast }}" min="2" max="200" /></label>
+            <label>MACD Slow <input type="number" name="macd_slow" value="{{ config.macd_slow }}" min="3" max="300" /></label>
+            <label>MACD Signal <input type="number" name="macd_signal" value="{{ config.macd_signal }}" min="2" max="200" /></label>
+            <label><input type="checkbox" name="show_ema" value="true" {% if config.show_ema == 'true' %}checked{% endif %}/> EMA</label>
+            <label><input type="checkbox" name="show_rsi" value="true" {% if config.show_rsi == 'true' %}checked{% endif %}/> RSI</label>
+            <label><input type="checkbox" name="show_macd" value="true" {% if config.show_macd == 'true' %}checked{% endif %}/> MACD</label>
+            <label><input type="checkbox" name="show_supertrend" value="true" {% if config.show_supertrend == 'true' %}checked{% endif %}/> Supertrend</label>
+            <label><input type="checkbox" name="show_volume" value="true" {% if config.show_volume == 'true' %}checked{% endif %}/> Volume</label>
+            <label><input type="checkbox" name="show_sr" value="true" {% if config.show_sr == 'true' %}checked{% endif %}/> S/R</label>
+            <button type="submit">Save Config</button>
+            <a href="/scanner?refresh=true"><button type="button">Run Fresh Scan</button></a>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>Filtered Candidates ({{ result.count }})</h2>
+        {% if result.error %}<p class="warn">{{ result.error }}</p>{% endif %}
+        <table>
+            <thead><tr><th>Symbol</th><th>Signal</th><th>Score</th><th>%</th><th>RSI</th><th>EMA20/50/100/200</th><th>S/R</th><th>MACD</th><th>Vol x</th><th>Reasons</th><th>Trend</th><th>Add Bought</th></tr></thead>
+            <tbody>
+            {% for h in result.hits %}
+            <tr>
+                <td>{{ h.symbol }}</td>
+                <td><strong>{{ h.signal }}</strong></td>
+                <td>{{ h.score }}</td>
+                <td class="{{ 'ok' if h.change_pct >= 0 else 'warn' }}">{{ h.change_pct }}</td>
+                <td>{{ h.daily_rsi }}</td>
+                <td>{{ h.ema20 }} / {{ h.ema50 }} / {{ h.ema100 }} / {{ h.ema200 }}</td>
+                <td>{{ h.support }} / {{ h.resistance }}</td>
+                <td>{{ h.macd }} / {{ h.macd_signal }}</td>
+                <td>{{ h.volume_ratio }}</td>
+                <td>{{ h.reasons }}</td>
+                <td>
+                    <svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none">
+                        <polyline points="{{ h.sparkline }}" fill="none" stroke="#1f6f78" stroke-width="1.5" />
+                    </svg>
+                </td>
+                <td>
+                    <form action="/scanner/bought/add" method="post" class="inline-form">
+                        <input type="hidden" name="symbol" value="{{ h.symbol }}" />
+                        <input type="number" step="0.1" name="entry_price" value="{{ h.resistance }}" style="width:90px" />
+                        <input type="number" name="quantity" value="1" style="width:70px" />
+                        <input type="text" name="note" placeholder="note" style="width:90px" />
+                        <button type="submit">Bought</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+</main>
+</body>
+</html>
+
