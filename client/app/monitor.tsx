@@ -7,6 +7,7 @@ import { useApiConfig } from '@/lib/api-config';
 import { formatNumber } from '@/lib/format';
 import { MonitorResponse } from '@/lib/types';
 
+/** Renders the bought-position reversal monitor. */
 export default function MonitorScreen() {
   const { apiBaseUrl, ready } = useApiConfig();
   const [monitor, setMonitor] = useState<MonitorResponse | null>(null);

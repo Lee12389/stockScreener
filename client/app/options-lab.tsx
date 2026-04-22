@@ -15,6 +15,7 @@ const SAMPLE_LEGS = `# side,kind,strike,premium,qty
 buy,call,22500,130,1
 sell,call,22600,95,1`;
 
+/** Renders the options strategy recommendation and payoff workspace. */
 export default function OptionsLabScreen() {
   const { apiBaseUrl } = useApiConfig();
   const [mode, setMode] = useState<'recommend' | 'custom'>('recommend');

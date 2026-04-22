@@ -22,6 +22,7 @@ export const unstable_settings = {
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
+/** Boots shared fonts and splash handling for the Expo app. */
 export default function RootLayout() {
   const [loaded, error] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
@@ -46,6 +47,7 @@ export default function RootLayout() {
   return <RootLayoutNav />;
 }
 
+/** Provides the shared navigation stack and app-wide providers. */
 function RootLayoutNav() {
   const theme = {
     ...DefaultTheme,

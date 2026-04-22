@@ -7,6 +7,7 @@ import { useApiConfig } from '@/lib/api-config';
 import { formatCompactCurrency, formatSigned } from '@/lib/format';
 import { DashboardSummary } from '@/lib/types';
 
+/** Renders the cross-platform desk summary and broker controls. */
 export default function DashboardScreen() {
   const { apiBaseUrl, ready } = useApiConfig();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
@@ -21,6 +22,7 @@ export default function DashboardScreen() {
     void loadDesk(false);
   }, [ready, apiBaseUrl]);
 
+  /** Loads dashboard health and summary data from the backend. */
   async function loadDesk(refresh: boolean) {
     setBusy(true);
     setError('');
@@ -38,6 +40,7 @@ export default function DashboardScreen() {
     }
   }
 
+  /** Connects or reconnects the broker session, then refreshes the desk. */
   async function connectBroker() {
     setBusy(true);
     setError('');
@@ -50,6 +53,7 @@ export default function DashboardScreen() {
     }
   }
 
+  /** Switches the persisted trade mode and refreshes the dashboard. */
   async function setMode(mode: 'paper' | 'live') {
     setBusy(true);
     setError('');

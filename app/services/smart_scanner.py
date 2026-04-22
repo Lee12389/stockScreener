@@ -1,4 +1,6 @@
-﻿from __future__ import annotations
+"""Scanner configuration, dataset, caching, and monitor helpers."""
+
+from __future__ import annotations
 
 import hashlib
 import json
@@ -9,11 +11,15 @@ from app.services.universe import build_universe
 
 
 class SmartScannerService:
+    """Coordinates scanner config storage, datasets, and bought monitoring."""
+
     def __init__(self, strategy_service, watchlist_service):
+        """Stores the injected strategy and watchlist services."""
         self.strategy_service = strategy_service
         self.watchlist_service = watchlist_service
 
     def get_config(self) -> dict:
+        """Returns the persisted scanner configuration as a plain dictionary."""
         with SessionLocal() as session:
             cfg = session.get(ScannerConfig, 1)
             if cfg is None:
@@ -23,6 +29,7 @@ class SmartScannerService:
             return _cfg_to_dict(cfg)
 
     def update_config(self, payload: dict) -> dict:
+        """Persists scanner configuration changes and returns the saved config."""
         with SessionLocal() as session:
             cfg = session.get(ScannerConfig, 1)
             if cfg is None:
@@ -35,6 +42,7 @@ class SmartScannerService:
             return _cfg_to_dict(cfg)
 
     def scan(self, force_refresh: bool = False) -> dict:
+        """Runs the legacy backend-side scan across the configured universe."""
         cfg = self.get_config()
 
         watch_custom = [w.symbol for w in self.watchlist_service.enabled_items() if w.source == 'manual']
@@ -49,6 +57,7 @@ class SmartScannerService:
         return self._scan_symbols(cfg=cfg, symbols=universe, force_refresh=force_refresh)
 
     def scan_shortlist(self, symbols: list[str], force_refresh: bool = False) -> dict:
+        """Runs the backend-side scan only for a supplied shortlist."""
         cfg = self.get_config()
         shortlist = [s.strip().upper() for s in symbols if s and s.strip()]
         if not shortlist:
@@ -56,6 +65,7 @@ class SmartScannerService:
         return self._scan_symbols(cfg=cfg, symbols=shortlist, force_refresh=force_refresh)
 
     def get_dataset(self, force_refresh: bool = False, symbols: list[str] | None = None) -> dict:
+        """Returns the raw scanner dataset consumed by frontend-heavy clients."""
         cfg = self.get_config()
 
         if symbols:
@@ -97,6 +107,7 @@ class SmartScannerService:
         }
 
     def _scan_symbols(self, cfg: dict, symbols: list[str], force_refresh: bool = False) -> dict:
+        """Builds cached backend-side scan summaries for a symbol set."""
         symbol_set = {s.strip().upper() for s in symbols if s and s.strip()}
         if not symbol_set:
             return {'error': 'No symbols to scan.', 'hits': [], 'count': 0}
@@ -166,6 +177,7 @@ class SmartScannerService:
         return {'count': len(hits), 'hits': hits, 'config': cfg}
 
     def add_bought(self, symbol: str, entry_price: float, quantity: int, note: str = '') -> dict:
+        """Adds or updates a bought-monitor row."""
         with SessionLocal() as session:
             row = session.query(BoughtMonitor).filter(BoughtMonitor.symbol == symbol).first()
             if row is None:
@@ -179,6 +191,7 @@ class SmartScannerService:
         return {'ok': True}
 
     def remove_bought(self, symbol: str) -> dict:
+        """Removes a symbol from the bought monitor."""
         with SessionLocal() as session:
             row = session.query(BoughtMonitor).filter(BoughtMonitor.symbol == symbol).first()
             if row:
@@ -187,6 +200,7 @@ class SmartScannerService:
         return {'ok': True}
 
     def list_bought(self) -> list[dict]:
+        """Returns all bought-monitor rows in UI-friendly dictionary form."""
         with SessionLocal() as session:
             rows = session.query(BoughtMonitor).order_by(BoughtMonitor.symbol).all()
             return [
@@ -201,6 +215,7 @@ class SmartScannerService:
             ]
 
     def monitor_bought(self, force_refresh: bool = False) -> dict:
+        """Builds reversal-monitor output for the currently tracked bought rows."""
         cfg = self.get_config()
         market, err = self.strategy_service.get_market_snapshot(
             force_refresh=force_refresh,
@@ -251,6 +266,7 @@ class SmartScannerService:
 
 
 def _cfg_to_dict(cfg) -> dict:
+    """Converts the ORM scanner config row into a plain dictionary."""
     return {
         'include_nifty50': cfg.include_nifty50,
         'include_midcap150': cfg.include_midcap150,
@@ -271,11 +287,13 @@ def _cfg_to_dict(cfg) -> dict:
 
 
 def _hash_cfg(cfg: dict) -> str:
+    """Hashes scanner config values so cached scan rows can be invalidated."""
     txt = json.dumps(cfg, sort_keys=True)
     return hashlib.sha256(txt.encode('utf-8')).hexdigest()
 
 
 def _evaluate_row(row: dict, cfg: dict) -> dict:
+    """Builds a compact backend-side scan summary from market snapshot data."""
     rsi = float(row.get('daily_rsi', 50.0))
     w_rsi = float(row.get('weekly_rsi', rsi))
     m_rsi = float(row.get('monthly_rsi', rsi))
@@ -343,6 +361,7 @@ def _evaluate_row(row: dict, cfg: dict) -> dict:
 
 
 def _reversal_flags(row: dict) -> tuple[bool, bool, list[str]]:
+    """Evaluates whether a tracked position is showing weak or strong reversal."""
     reasons = []
     weak_count = 0
 

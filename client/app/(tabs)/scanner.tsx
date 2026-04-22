@@ -12,6 +12,7 @@ import { BoughtInfo, PresetKey, ScannerConfig, ScannerDatasetItem, ScannerRow } 
 
 const INTERVALS = ['FIFTEEN_MINUTE', 'ONE_HOUR', 'ONE_DAY', 'ONE_WEEK', 'ONE_MONTH'] as const;
 
+/** Renders the shared mobile/web scanner experience backed by local ranking. */
 export default function ScannerScreen() {
   const { apiBaseUrl, ready } = useApiConfig();
   const [config, setConfig] = useState<ScannerConfig | null>(null);
@@ -38,6 +39,7 @@ export default function ScannerScreen() {
     void loadDataset(false);
   }, [ready, apiBaseUrl]);
 
+  /** Fetches the raw scanner dataset and rebuilds rows locally on-device. */
   async function loadDataset(refresh: boolean) {
     setBusy(true);
     setError('');
@@ -62,6 +64,7 @@ export default function ScannerScreen() {
     }
   }
 
+  /** Persists scanner config changes and refreshes the dataset. */
   async function saveConfig(nextConfig: ScannerConfig) {
     setBusy(true);
     setError('');
@@ -76,6 +79,7 @@ export default function ScannerScreen() {
     }
   }
 
+  /** Adds or updates the currently selected symbol in the bought monitor. */
   async function trackRow() {
     if (!selectedRow) {
       return;
@@ -97,6 +101,7 @@ export default function ScannerScreen() {
     }
   }
 
+  /** Removes a symbol from the bought monitor and refreshes the rows. */
   async function untrackRow(symbol: string) {
     setBusy(true);
     setError('');
@@ -110,6 +115,7 @@ export default function ScannerScreen() {
     }
   }
 
+  /** Opens the detail modal for the selected scanner row. */
   function openRow(row: ScannerRow) {
     setSelectedRow(row);
     setChartTimeframe('primary');
@@ -118,6 +124,7 @@ export default function ScannerScreen() {
     setNote(row.bought?.note || '');
   }
 
+  /** Opens the richer browser-based scanner for desktop-style workflows. */
   async function openAdvancedScanner() {
     const url = `${apiBaseUrl}/scanner`;
     await WebBrowser.openBrowserAsync(url);
@@ -298,10 +305,12 @@ export default function ScannerScreen() {
   );
 }
 
+/** Normalizes boolean-like values coming back from persisted config. */
 function boolish(value: unknown) {
   return value === true || value === 'true';
 }
 
+/** Converts the mutable scanner config into the backend payload shape. */
 function serializeConfig(config: ScannerConfig): ScannerConfig {
   return {
     ...config,

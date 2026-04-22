@@ -1,30 +1,25 @@
-﻿# Angel One AutoTrader
+# Angel One AutoTrader
 
-Extensible FastAPI backend plus a shared Expo Router client for strategy scanning, paper trading, and future live automation across web, Android, and iOS.
+Angel One AutoTrader is a local-first trading workspace built with a FastAPI backend, SQLite storage, browser-rendered web pages, and a shared Expo Router client for web, Android, and iOS.
+
+The project is optimized around one core rule: once the backend has fetched raw market data, heavy scanner operations should happen on the user's machine. That keeps charting, indicator expansion, preset tuning, and future feature growth fast and flexible.
+
+## Documentation Map
+
+- [User Guide](./docs/user-guide.md)
+- [Developer Guide](./docs/developer-guide.md)
+- [Architecture](./docs/architecture.md)
+- [API Reference](./docs/api-reference.md)
 
 ## Highlights
 
-- Angel One SmartAPI integration for symbol search, quotes, and candle history.
-- API-first architecture for heavy frontend rendering (web/mobile) while backend focuses on business logic and risk calculations.
-- Strategy page with:
-  - RSI multi-timeframe flow
-  - Supertrend support/resistance signals
-  - Merged strategy mode (RSI + Supertrend)
-  - filters, lightweight sparklines, and cached fast rendering
-- Watchlist page with sector default seeds (top 10 per sector starter set).
-- Smart scanner page with:
-  - backend raw candle fetch + frontend indicator/scanner math
-  - TradingView-style indicator toggles and column controls
-  - daily, weekly, and monthly setup hunting
-  - expanded local charts with EMA, VWAP, Bollinger, Supertrend, RSI, stochastic, MACD, and volume
-  - practical presets like momentum breakout, trend pullback, VWAP reclaim, relative strength, squeeze, support bounce, and reversal sell
-- Paper trading system:
-  - configurable paper capital
-  - manual paper trade by symbol and strategy
-  - automated paper trader (interval based)
-  - quantity optimization based on capital, signal strength, and trade slots
-  - positions, trade ledger, realized/unrealized PnL, equity
-- Safe live mode guardrails remain (paper-first default).
+- Angel One SmartAPI integration for symbol search, quotes, and candle history
+- frontend-heavy scanner architecture for web and mobile
+- daily, weekly, and monthly scan workflows
+- TradingView-style scanner controls and expanded charts in the web app
+- shared Expo client for Desk, Scanner, Watchlist, Paper, Strategies, Monitor, Tournament, Options Lab, and Settings
+- paper trading, tournament simulation, and options strategy tooling
+- SQLite-backed local persistence plus cleanup helpers
 
 ## Config Priority
 
@@ -34,21 +29,21 @@ Extensible FastAPI backend plus a shared Expo Router client for strategy scannin
 
 `defaults.yaml` and `.env` are git-ignored.
 
-## Run (Windows)
+## Backend Quick Start
+
+Windows:
 
 ```powershell
 ./scripts/run_windows.ps1
 ```
 
-## Run (Linux/macOS)
+Linux/macOS:
 
 ```bash
 bash ./scripts/run_linux.sh
 ```
 
-## Run Cross-Platform Client
-
-The `client/` app is a shared Expo Router frontend that targets web, Android, and iOS from one codebase.
+## Shared Client Quick Start
 
 Windows:
 
@@ -74,31 +69,18 @@ npm run android
 npm run ios
 ```
 
-Set `EXPO_PUBLIC_API_BASE_URL` or update the in-app Settings screen if the client needs to reach a different backend host than the default local machine target.
+Set `EXPO_PUBLIC_API_BASE_URL` or change the in-app Settings screen if the client should talk to a different backend host.
 
-### Android Debug Build / Install (Windows)
-
-Use the helper below to generate the native Android project, build a debug APK, and install it to a USB-connected Android phone when one is available:
+## Android Debug Build / Install
 
 ```powershell
 ./scripts/install_android_debug.ps1
 ./scripts/install_android_debug.ps1 -NoInstall
 ```
 
-The script auto-detects the local Android SDK and JDK, then builds `client/android/app/build/outputs/apk/debug/app-debug.apk`.
+The APK is produced at `client/android/app/build/outputs/apk/debug/app-debug.apk`.
 
-Fresh `npm install` runs automatically re-apply the native Windows linker workaround through `patch-package`, so the Android client stays buildable after dependency reinstalls.
-
-### iOS Note
-
-Local iOS installs require macOS + Xcode. The shared Expo Router client is kept iOS-compatible, but on Windows you should either:
-
-- run the web client locally, or
-- build iOS from a Mac or EAS Build
-
-## Cleanup / Maintenance
-
-Use the cleanup helpers to prune stale SQLite rows, temporary caches, and old compiled files from the repo.
+## Cleanup
 
 Windows:
 
@@ -114,65 +96,20 @@ bash ./scripts/cleanup_linux.sh
 bash ./scripts/cleanup_linux.sh --dry-run
 ```
 
-The cleanup tool uses Python's built-in `sqlite3` module and supports retention flags such as `--scan-cache-days`, `--analysis-days`, `--paper-trade-days`, and `--bot-trade-days`.
+## Main Surfaces
 
-## Main Pages
+- `/` dashboard / Desk
+- `/watchlist`
+- `/strategies`
+- `/scanner`
+- `/monitor`
+- `/paper`
+- `/tournament`
+- `/options-lab`
 
-- `/` dashboard
-- `/watchlist` watchlist management
-- `/strategies` RSI / Supertrend / merged signals
-- `/paper` paper trading account, manual and automated paper execution
-- `/tournament` 10-strategy bot tournament (each bot starts with configurable capital)
-- `/scanner` smart multi-timeframe scanner with indicator toggles
-- `/monitor` bought stocks reversal monitor (weak/strong sell)
-- `/options-lab` unified Nifty50 options strategy engine + custom strategy builder
+## Important Notes
 
-## Key APIs
-
-- `GET /api/strategies/scan?strategy=rsi|supertrend|merged`
-- `POST /api/paper/fund`
-- `POST /api/paper/trade`
-- `POST /api/paper/auto/start`
-- `POST /api/paper/auto/stop`
-- `GET /api/paper/summary`
-- `POST /api/tournament/init`
-- `POST /api/tournament/run-once`
-- `POST /api/tournament/start`
-- `POST /api/tournament/stop`
-- `GET /api/tournament/leaderboard`
-- `POST /api/options/recommend`
-- `POST /api/options/custom`
-
-## Frontend-Heavy Architecture (Current Direction)
-
-- Backend responsibility:
-  - broker connection/session
-  - candle/option chain fetch and durable SQLite state
-  - risk/business calculations and trade execution
-  - paper-trade execution and ledger
-- Frontend responsibility:
-  - scanner indicator math, ranking, filtering, and shortlist generation after raw fetch
-  - charts/graphs/payoff visuals
-  - interactive strategy building UX and chart toggles
-  - high-frequency UI updates and device-specific optimizations
-
-## Multi-Platform Plan (Web + Android + iOS)
-
-- Shared Expo Router app now lives in `client/`.
-- The same client codebase serves:
-  - web via Expo web export/dev server
-  - Android via Expo/Android tooling and the Windows debug APK helper
-  - iOS via Expo/iOS tooling on macOS or EAS Build
-- GitHub Actions now build-check the shared client on web, Android, and iOS hosts and publish the web bundle plus Android debug APK as workflow artifacts.
-- CORS is enabled (`CORS_ORIGINS`) so the Expo web client can connect to the backend.
-- The in-app Settings screen lets phones point to the laptop LAN IP when you run the backend locally.
-
-## Notes
-
-- First full fresh scan can take time depending on watchlist size.
-- After the scanner dataset is fetched, the browser handles filters, scores, scan presets, and chart rendering locally.
-- The Expo client also keeps scanner ranking/filtering logic on-device after the raw dataset fetch.
-- Weekly and monthly scanner intervals are available for longer-term swing and position scans.
-- Live trading stays disabled unless explicitly enabled with env + mode switch.
-
-
+- first full scanner refresh can take time depending on the universe size
+- once the dataset is fetched, the scanner math is intentionally performed on the web/mobile client
+- weekly and monthly intervals are available for longer-term stock selection
+- live trading stays opt-in; paper remains the default safe path

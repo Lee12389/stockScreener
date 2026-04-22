@@ -1,3 +1,4 @@
+/** Browser scanner controller that keeps ranking, filters, and chart work local. */
 (function () {
     const bootstrap = window.__SCANNER_BOOTSTRAP__ || {};
     const STORAGE_KEY = 'autobot.scanner.v3';
@@ -106,6 +107,7 @@
         symbols: state.scopeSymbols.length ? state.scopeSymbols : null,
     });
 
+    /** Wires all scanner controls, modal actions, and chart toggles. */
     function bindEvents() {
         if (els.configForm) {
             els.configForm.addEventListener('submit', handleConfigSubmit);
@@ -230,6 +232,7 @@
         });
     }
 
+    /** Loads persisted scanner UI preferences from localStorage. */
     function loadPrefs() {
         const base = {
             columns: ALL_COLUMNS.reduce(function (acc, key) {
@@ -259,10 +262,12 @@
         }
     }
 
+    /** Persists the current scanner UI preferences to localStorage. */
     function savePrefs() {
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state.prefs));
     }
 
+    /** Applies saved preferences back onto the scanner controls. */
     function hydrateUiFromPrefs() {
         state.activePreset = state.prefs.activePreset || 'all';
         if (filterEls.sort) {
@@ -323,6 +328,7 @@
         fetchDataset({ refresh: true, symbols: currentScopeSymbols() });
     }
 
+    /** Converts the config form state into the backend payload shape. */
     function serializeConfigForm() {
         const formData = new window.FormData(els.configForm);
         return {
@@ -348,6 +354,7 @@
         return state.scopeSymbols.length ? state.scopeSymbols.slice() : null;
     }
 
+    /** Fetches the raw scanner dataset and triggers local processing. */
     async function fetchDataset(options) {
         const params = options || {};
         if (state.busy) {
@@ -421,6 +428,7 @@
         }
     }
 
+    /** Rebuilds scanner rows locally after a dataset fetch completes. */
     async function processDataset(items) {
         state.rows = [];
         state.rowMap = new Map();
@@ -453,6 +461,7 @@
         els.sectorFilter.innerHTML = options.join('');
     }
 
+    /** Applies the current filter stack and sorting to the local rows. */
     function applyFilters() {
         const symbolText = textValue(filterEls.symbol);
         const sector = textValue(filterEls.sector);
@@ -579,6 +588,7 @@
         return row.scans.indexOf(PRESET_LABELS[preset]) !== -1;
     }
 
+    /** Renders the visible scanner rows into the table body. */
     function renderTable() {
         if (!els.body) {
             return;
@@ -694,6 +704,7 @@
         ].join('');
     }
 
+    /** Handles row-level actions such as opening charts and tracking symbols. */
     function handleTableClick(event) {
         const chartButton = event.target.closest('[data-open-chart]');
         if (chartButton) {
@@ -792,6 +803,7 @@
         });
     }
 
+    /** Opens the expanded chart modal for a scanner symbol. */
     function openChart(symbol) {
         const row = state.rowMap.get(String(symbol || '').toUpperCase());
         if (!row || !els.modal) {
@@ -806,6 +818,7 @@
         window.requestAnimationFrame(renderExpandedChart);
     }
 
+    /** Closes the expanded chart modal and clears active row state. */
     function closeChart() {
         if (!els.modal) {
             return;
@@ -814,6 +827,7 @@
         state.chartRow = null;
     }
 
+    /** Renders the summary copy and bought-monitor controls in the chart modal. */
     function renderChartDetails() {
         if (!state.chartRow) {
             return;
@@ -864,6 +878,7 @@
         }
     }
 
+    /** Rebuilds the expanded chart canvas for the active symbol and timeframe. */
     function renderExpandedChart() {
         if (!state.chartRow || !els.chartCanvas) {
             return;
@@ -875,6 +890,7 @@
         drawChart(els.chartCanvas, chartData, state.prefs.chartIndicators);
     }
 
+    /** Calculates all derived scanner metrics for one dataset item. */
     function buildRowSummary(item, config, boughtInfo) {
         const candles = unpackCandles(item.candles || []);
         const dailyCandles = unpackCandles((item.daily_candles && item.daily_candles.length ? item.daily_candles : item.candles) || []);
@@ -1146,6 +1162,7 @@
         return row;
     }
 
+    /** Grades a tracked row for weak or strong sell conditions. */
     function evaluateBoughtReversal(row) {
         const reasons = [];
         let strength = 0;
@@ -1174,6 +1191,7 @@
         return { state: 'HOLD', reasons: ['Trend is still healthy.'] };
     }
 
+    /** Builds the candle, indicator, and panel data for the expanded chart. */
     function buildChartData(row, timeframe) {
         let candles = row.candles;
         if (timeframe === 'daily') {
@@ -1218,6 +1236,7 @@
         };
     }
 
+    /** Draws the expanded multi-panel chart on the supplied canvas. */
     function drawChart(canvas, chartData, indicatorPrefs) {
         const dpr = window.devicePixelRatio || 1;
         const width = Math.max(900, canvas.clientWidth || 900);
@@ -1517,6 +1536,7 @@
         return y + height - (((value - min) / ((max - min) || 1)) * height);
     }
 
+    /** Resets the scanner filter controls to their default values. */
     function clearFilters() {
         Object.keys(filterEls).forEach(function (key) {
             const el = filterEls[key];
@@ -1538,6 +1558,7 @@
         applyFilters();
     }
 
+    /** Copies the currently visible symbol list to the clipboard. */
     async function copyVisibleSymbols() {
         if (!state.filteredRows.length) {
             setStatus('No visible rows to copy.', 'error');
@@ -1548,6 +1569,7 @@
         setStatus('Visible symbols copied to clipboard.', 'success');
     }
 
+    /** Downloads the visible scanner rows as a CSV file. */
     function downloadVisibleCsv() {
         if (!state.filteredRows.length) {
             setStatus('No visible rows to export.', 'error');
@@ -1694,6 +1716,7 @@
         return new Promise(function (resolve) { window.setTimeout(resolve, 0); });
     }
 
+    /** Expands packed candle arrays from the API into objects. */
     function unpackCandles(packed) {
         return (packed || []).map(function (row) {
             return {
@@ -1707,6 +1730,7 @@
         });
     }
 
+    /** Converts numeric series values into inline sparkline SVG points. */
     function sparklinePoints(values) {
         const clean = values.filter(isFiniteNumber);
         if (!clean.length) {
@@ -1731,6 +1755,7 @@
             .replace(/'/g, '&#39;');
     }
 
+    /** Formats backend interval constants into short display labels. */
     function intervalLabelFor(value) {
         const mapping = {
             FIVE_MINUTE: '5m',
@@ -1776,6 +1801,7 @@
         return Number.isNaN(parsed.getTime()) ? null : parsed;
     }
 
+    /** Aggregates close values into weekly or monthly buckets. */
     function aggregateCloseByBucket(candles, mode) {
         const buckets = new Map();
         candles.forEach(function (candle) {
@@ -1789,6 +1815,7 @@
         return Array.from(buckets.values());
     }
 
+    /** Aggregates full candles into weekly or monthly OHLCV buckets. */
     function aggregateCandlesByBucket(candles, mode) {
         const buckets = new Map();
         const order = [];
@@ -1838,6 +1865,7 @@
         return utc.getUTCFullYear() + '-W' + String(week).padStart(2, '0');
     }
 
+    /** Calculates an exponential moving average series. */
     function emaSeries(values, period) {
         if (!values.length) {
             return [];
@@ -1863,6 +1891,7 @@
         return output;
     }
 
+    /** Calculates an RSI series for the supplied closes. */
     function rsiSeries(values, period) {
         if (values.length < period + 1) {
             return values.map(function () { return 50; });
@@ -1892,6 +1921,7 @@
         return output.slice(-values.length);
     }
 
+    /** Calculates MACD, signal, and histogram series. */
     function macdSeries(values, fast, slow, signal) {
         const fastEma = emaSeries(values, Math.max(2, fast));
         const slowEma = emaSeries(values, Math.max(3, slow));
@@ -1931,6 +1961,7 @@
         return atr;
     }
 
+    /** Calculates a simplified ADX trend-strength series. */
     function adxSeries(highs, lows, closes, period) {
         if (closes.length < period + 1) {
             return closes.map(function () { return 10; });
@@ -1965,6 +1996,7 @@
         return emaSeries(dx, period);
     }
 
+    /** Calculates stochastic K and D series. */
     function stochasticSeries(highs, lows, closes, period, smooth) {
         const k = closes.map(function (_, index) {
             const start = Math.max(0, index - period + 1);
@@ -1979,6 +2011,7 @@
         };
     }
 
+    /** Calculates Bollinger band and band-width series. */
     function bollingerSeries(values, period, multiplier) {
         const middle = smaSeries(values, period);
         const upper = [];
@@ -2004,6 +2037,7 @@
         return { middle: middle, upper: upper, lower: lower, width: width };
     }
 
+    /** Calculates a client-side Supertrend line and bullish state. */
     function supertrendSeries(highs, lows, closes, period, multiplier) {
         const atr = atrSeries(highs, lows, closes, period);
         const upperBasic = highs.map(function (high, index) {
@@ -2042,6 +2076,7 @@
         return { line: line, bullish: bullish };
     }
 
+    /** Calculates a cumulative VWAP series for the active candle set. */
     function vwapSeries(candles) {
         let pv = 0;
         let vv = 0;

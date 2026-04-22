@@ -5,6 +5,7 @@ import { Tabs } from 'expo-router';
 import { palette } from '@/components/ui';
 
 // You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
+/** Renders a tab icon using the shared FontAwesome mapping. */
 function TabBarIcon(props: {
   name: React.ComponentProps<typeof FontAwesome>['name'];
   color: string;
@@ -12,6 +13,7 @@ function TabBarIcon(props: {
   return <FontAwesome size={28} style={{ marginBottom: -3 }} {...props} />;
 }
 
+/** Declares the shared bottom-tab layout for the main app surfaces. */
 export default function TabLayout() {
   return (
     <Tabs

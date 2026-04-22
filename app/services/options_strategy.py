@@ -1,3 +1,5 @@
+"""Options strategy parsing, packaging, and payoff helpers."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -5,6 +7,8 @@ from dataclasses import dataclass
 
 @dataclass
 class OptionRow:
+    """Represents one option-chain row parsed from CSV-style text."""
+
     strike: float
     call_oi: float
     put_oi: float
@@ -18,6 +22,8 @@ class OptionRow:
 
 @dataclass
 class OptionLeg:
+    """Represents one user-defined option leg for a custom strategy."""
+
     side: str
     kind: str
     strike: float
@@ -26,7 +32,10 @@ class OptionLeg:
 
 
 class OptionsStrategyService:
+    """Builds default and custom option strategy views from simple inputs."""
+
     def parse_rows(self, text: str) -> list[OptionRow]:
+        """Parses option-chain CSV text into normalized option rows."""
         rows: list[OptionRow] = []
         for line in text.splitlines():
             ln = line.strip()
@@ -55,6 +64,7 @@ class OptionsStrategyService:
         return rows
 
     def parse_legs(self, text: str) -> list[OptionLeg]:
+        """Parses custom strategy leg text into normalized option legs."""
         legs: list[OptionLeg] = []
         for line in text.splitlines():
             ln = line.strip()
@@ -77,6 +87,7 @@ class OptionsStrategyService:
         return legs
 
     def recommend(self, spot: float, capital: float, rows: list[OptionRow]) -> dict:
+        """Suggests simple default option structures from chain positioning."""
         if not rows:
             return {'error': 'No option chain rows provided.'}
 
@@ -109,6 +120,7 @@ class OptionsStrategyService:
         }
 
     def custom_strategy(self, spot: float, capital: float, rows: list[OptionRow], legs: list[OptionLeg], lot_size: int = 50) -> dict:
+        """Builds a payoff curve and risk summary for user-defined legs."""
         if not legs:
             return {'error': 'No strategy legs provided. Add at least one leg.'}
 
@@ -191,6 +203,7 @@ class OptionsStrategyService:
         }
 
     def _build_strategies(self, spot: float, capital: float, rows: list[OptionRow], bias: str) -> list[dict]:
+        """Builds a few default spread structures around the spot price."""
         strikes = sorted([r.strike for r in rows])
         atm = min(strikes, key=lambda s: abs(s - spot))
 
@@ -263,6 +276,7 @@ class OptionsStrategyService:
 
     @staticmethod
     def _intrinsic(expiry_price: float, strike: float, kind: str) -> float:
+        """Calculates option intrinsic value for a single expiry price."""
         if kind == 'call':
             return max(0.0, expiry_price - strike)
         return max(0.0, strike - expiry_price)
@@ -277,6 +291,7 @@ class OptionsStrategyService:
         legs: str,
         volume_weight: float,
     ) -> dict:
+        """Packages a strategy summary with simple expectancy scoring."""
         rr = (max_profit / max_loss) if max_loss > 0 else 0.0
         expectancy = (prob_win * max_profit) - ((1 - prob_win) * max_loss)
         cap_risk_pct = (max_loss / max(capital, 1.0)) * 100.0
@@ -297,6 +312,7 @@ class OptionsStrategyService:
 
     @staticmethod
     def _breakevens(curve: list[dict]) -> list[float]:
+        """Finds approximate breakeven points from the payoff curve."""
         if len(curve) < 2:
             return []
         out: list[float] = []
@@ -315,6 +331,7 @@ class OptionsStrategyService:
 
     @staticmethod
     def _probability_of_profit(curve: list[dict]) -> float:
+        """Approximates the profit probability from sampled payoff points."""
         if not curve:
             return 0.0
         win = sum(1 for p in curve if p['pnl'] >= 0)
@@ -322,6 +339,7 @@ class OptionsStrategyService:
 
     @staticmethod
     def _payoff_svg(curve: list[dict]) -> str:
+        """Converts the payoff curve into normalized SVG polyline points."""
         if not curve:
             return ''
         xs = [p['price'] for p in curve]
@@ -340,10 +358,12 @@ class OptionsStrategyService:
 
     @staticmethod
     def _nearest(strikes: list[float], val: float) -> float:
+        """Returns the strike closest to the requested value."""
         return min(strikes, key=lambda s: abs(s - val))
 
     @staticmethod
     def _avg_step(strikes: list[float]) -> float:
+        """Estimates the average strike spacing in the chain."""
         if len(strikes) < 2:
             return 50.0
         diffs = [abs(strikes[i] - strikes[i - 1]) for i in range(1, len(strikes))]

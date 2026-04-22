@@ -1,4 +1,6 @@
-﻿from __future__ import annotations
+"""Built-in stock universe definitions for scanner expansion."""
+
+from __future__ import annotations
 
 from app.services.watchlist import SECTOR_TOP10
 
@@ -18,6 +20,7 @@ NIFTY500_SAMPLE = sorted(set(NIFTY50 + MIDCAP150_SAMPLE))
 
 
 def build_universe(include_nifty50: bool, include_midcap150: bool, include_nifty500: bool, custom_symbols: list[str]) -> list[str]:
+    """Builds the effective scanner symbol universe from enabled sources."""
     symbols: set[str] = set()
     if include_nifty50:
         symbols.update(NIFTY50)

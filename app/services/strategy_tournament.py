@@ -1,4 +1,6 @@
-﻿from __future__ import annotations
+﻿"""Tournament bot orchestration and scoring helpers."""
+
+from __future__ import annotations
 
 from datetime import datetime
 
@@ -24,12 +26,16 @@ INSTRUMENTS = ('EQ', 'FUT', 'OPT')
 
 
 class StrategyTournamentService:
+    """Runs synthetic trading bots against shared market snapshots."""
+
     def __init__(self, strategy_service):
+        """Initializes the tournament service and its scheduler."""
         self.strategy_service = strategy_service
         self.scheduler = BackgroundScheduler()
         self.scheduler.start()
 
     def setup_bots(self, capital: float = 1000000.0) -> dict:
+        """Resets tournament state and seeds fresh bots."""
         with SessionLocal() as session:
             session.query(StrategyBotPosition).delete()
             session.query(StrategyBotTrade).delete()
@@ -54,6 +60,7 @@ class StrategyTournamentService:
         return self.leaderboard()
 
     def run_once(self, refresh_signals: bool = True) -> dict:
+        """Executes one full tournament cycle across all bots."""
         market, err = self.strategy_service.get_market_snapshot(force_refresh=refresh_signals)
         if err:
             return {'ok': False, 'message': err}
@@ -74,6 +81,7 @@ class StrategyTournamentService:
         return {'ok': True, 'leaderboard': self.leaderboard()}
 
     def start(self, interval_seconds: int = 60, refresh_signals: bool = True) -> None:
+        """Starts scheduled tournament execution."""
         self.scheduler.remove_all_jobs()
         self.scheduler.add_job(
             self.run_once,
@@ -85,9 +93,11 @@ class StrategyTournamentService:
         )
 
     def stop(self) -> None:
+        """Stops scheduled tournament execution."""
         self.scheduler.remove_all_jobs()
 
     def leaderboard(self) -> dict:
+        """Builds the leaderboard and recent trade feed for the UI."""
         jobs = self.scheduler.get_jobs()
         with SessionLocal() as session:
             bots = session.query(StrategyBot).all()
@@ -143,6 +153,7 @@ class StrategyTournamentService:
             }
 
     def _process_bot(self, session, bot: StrategyBot, market: dict[str, dict]) -> None:
+        """Processes exits and new entries for a single tournament bot."""
         positions = session.query(StrategyBotPosition).filter(StrategyBotPosition.bot_id == bot.id).all()
 
         # Manage exits first.
@@ -222,6 +233,7 @@ class StrategyTournamentService:
                 reserved_now += reserve
 
     def _close_position(self, session, bot: StrategyBot, pos: StrategyBotPosition, exit_price: float, reason: str) -> None:
+        """Closes a tournament position and records its realized outcome."""
         pnl_unit = (exit_price - pos.entry_price) if pos.side == 'BUY' else (pos.entry_price - exit_price)
         pnl = pnl_unit * pos.quantity * _contract_size(pos.instrument)
 
@@ -250,6 +262,7 @@ class StrategyTournamentService:
         session.delete(pos)
 
     def _mark_to_market(self, session, bot: StrategyBot, market: dict[str, dict]) -> None:
+        """Updates bot equity and drawdown from current market marks."""
         positions = session.query(StrategyBotPosition).filter(StrategyBotPosition.bot_id == bot.id).all()
         unrealized = 0.0
         for p in positions:
@@ -267,6 +280,7 @@ class StrategyTournamentService:
 
 
 def _strategy_score(strategy_key: str, row: dict) -> float:
+    """Scores one market row according to the selected tournament bot style."""
     close = row.get('close', 0.0)
     ema50 = row.get('ema50', close)
     ema20 = row.get('ema20', close)
@@ -307,6 +321,7 @@ def _strategy_score(strategy_key: str, row: dict) -> float:
 
 
 def _entry_levels(row: dict, entry: float, side: str) -> tuple[float, float, float]:
+    """Calculates stop-loss and two target levels for a new entry."""
     support = float(row.get('support', entry * 0.98) or entry * 0.98)
     resistance = float(row.get('resistance', entry * 1.02) or entry * 1.02)
     base_risk = max(abs(entry - support), entry * 0.01)
@@ -328,6 +343,7 @@ def _entry_levels(row: dict, entry: float, side: str) -> tuple[float, float, flo
 
 
 def _optimize_qty(bot: StrategyBot, entry: float, sl: float, instrument: str, strength: float, trades_left: int) -> tuple[int, float]:
+    """Sizes a tournament position and returns its reserved margin."""
     if entry <= 0:
         return 0, 0.0
 
@@ -349,6 +365,7 @@ def _optimize_qty(bot: StrategyBot, entry: float, sl: float, instrument: str, st
 
 
 def _instrument_mark_price(row: dict, instrument: str, side: str) -> float:
+    """Builds a mark price for equity, futures, or synthetic options."""
     close = float(row.get('close', 1.0))
     if instrument == 'EQ':
         return close
@@ -366,6 +383,7 @@ def _instrument_mark_price(row: dict, instrument: str, side: str) -> float:
 
 
 def _margin_factor(instrument: str) -> float:
+    """Returns the rough margin multiplier for a synthetic instrument."""
     if instrument == 'EQ':
         return 1.0
     if instrument == 'FUT':
@@ -374,6 +392,7 @@ def _margin_factor(instrument: str) -> float:
 
 
 def _contract_size(instrument: str) -> int:
+    """Returns the synthetic contract size used for PnL calculations."""
     if instrument == 'EQ':
         return 1
     if instrument == 'FUT':

@@ -1,4 +1,6 @@
-﻿from __future__ import annotations
+"""SQLite models, session helpers, and lightweight schema guards."""
+
+from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
@@ -8,10 +10,12 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 
 class Base(DeclarativeBase):
-    pass
+    """Base class for all SQLAlchemy models in the local SQLite database."""
 
 
 class TradeLog(Base):
+    """Stores live and paper trade attempts for audit and guardrail tracking."""
+
     __tablename__ = 'trade_logs'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -26,6 +30,8 @@ class TradeLog(Base):
 
 
 class AppState(Base):
+    """Stores small key/value flags such as the current trade mode."""
+
     __tablename__ = 'app_state'
 
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -33,6 +39,8 @@ class AppState(Base):
 
 
 class AnalysisSnapshot(Base):
+    """Stores the suggestion output produced by recurring analysis jobs."""
+
     __tablename__ = 'analysis_snapshots'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -45,6 +53,8 @@ class AnalysisSnapshot(Base):
 
 
 class WatchlistItem(Base):
+    """Stores each watchlist symbol together with its source and broker token."""
+
     __tablename__ = 'watchlist_items'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -58,6 +68,8 @@ class WatchlistItem(Base):
 
 
 class PaperAccount(Base):
+    """Stores the paper trading account cash and realized PnL summary."""
+
     __tablename__ = 'paper_account'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
@@ -68,6 +80,8 @@ class PaperAccount(Base):
 
 
 class PaperPosition(Base):
+    """Stores open paper-trading positions by symbol."""
+
     __tablename__ = 'paper_positions'
 
     symbol: Mapped[str] = mapped_column(String(32), primary_key=True)
@@ -79,6 +93,8 @@ class PaperPosition(Base):
 
 
 class PaperTrade(Base):
+    """Stores the paper trading ledger shown in the UI."""
+
     __tablename__ = 'paper_trades'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -97,6 +113,8 @@ class PaperTrade(Base):
 
 
 class StrategyBot(Base):
+    """Stores tournament bot account state and performance metrics."""
+
     __tablename__ = 'strategy_bots'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -116,6 +134,8 @@ class StrategyBot(Base):
 
 
 class StrategyBotPosition(Base):
+    """Stores open simulated positions for each tournament bot."""
+
     __tablename__ = 'strategy_bot_positions'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -136,6 +156,8 @@ class StrategyBotPosition(Base):
 
 
 class StrategyBotTrade(Base):
+    """Stores closed tournament trades for leaderboard and review use."""
+
     __tablename__ = 'strategy_bot_trades'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -154,6 +176,8 @@ class StrategyBotTrade(Base):
 
 
 class BoughtMonitor(Base):
+    """Stores manually tracked bought positions used by the monitor page."""
+
     __tablename__ = 'bought_monitor'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -167,6 +191,8 @@ class BoughtMonitor(Base):
 
 
 class ScannerConfig(Base):
+    """Stores persisted scanner settings shared across web and mobile flows."""
+
     __tablename__ = 'scanner_config'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
@@ -189,6 +215,8 @@ class ScannerConfig(Base):
 
 
 class ScanResultCache(Base):
+    """Stores cached backend-side scan summaries keyed by config and symbol."""
+
     __tablename__ = 'scan_result_cache'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -206,6 +234,7 @@ SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False, exp
 
 
 def init_db() -> None:
+    """Creates the local schema and applies lightweight compatibility guards."""
     Base.metadata.create_all(_engine)
     _ensure_watchlist_schema()
     _ensure_strategy_bot_schema()
@@ -213,6 +242,7 @@ def init_db() -> None:
 
 
 def get_state(session, key: str, default: str) -> str:
+    """Reads a state value from SQLite, seeding it when it does not exist."""
     row = session.get(AppState, key)
     if row is None:
         row = AppState(key=key, value=default)
@@ -223,6 +253,7 @@ def get_state(session, key: str, default: str) -> str:
 
 
 def set_state(session, key: str, value: str) -> None:
+    """Writes a small application state value into SQLite."""
     row = session.get(AppState, key)
     if row is None:
         row = AppState(key=key, value=value)
@@ -233,6 +264,7 @@ def set_state(session, key: str, value: str) -> None:
 
 
 def _ensure_watchlist_schema() -> None:
+    """Adds missing watchlist columns for older local databases."""
     # Lightweight migration for existing local DBs without Alembic.
     with _engine.begin() as conn:
         cols = {
@@ -248,6 +280,7 @@ def _ensure_watchlist_schema() -> None:
 
 
 def _ensure_paper_defaults() -> None:
+    """Seeds default rows required by paper trading and scanner config."""
     with _engine.begin() as conn:
         exists = conn.execute(text("SELECT id FROM paper_account WHERE id = 1")).fetchone()
         if not exists:
@@ -271,6 +304,7 @@ def _ensure_paper_defaults() -> None:
 
 
 def _ensure_strategy_bot_schema() -> None:
+    """Adds newer tournament position columns to older local databases."""
     with _engine.begin() as conn:
         cols = {
             row[1]

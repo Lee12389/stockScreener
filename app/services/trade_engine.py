@@ -1,4 +1,6 @@
-﻿from __future__ import annotations
+"""Trade execution helpers for live and paper-safe order routing."""
+
+from __future__ import annotations
 
 from app.config import get_settings
 from app.db import SessionLocal, TradeLog, get_state
@@ -6,15 +8,20 @@ from app.models import TradeRequest, TradeResponse
 
 
 class TradeEngine:
+    """Validates trade requests and routes them to paper or live execution."""
+
     def __init__(self, angel_client):
+        """Stores the broker client and trade guardrail settings."""
         self.angel_client = angel_client
         self.settings = get_settings()
 
     def current_mode(self) -> str:
+        """Reads the persisted global trade mode from SQLite."""
         with SessionLocal() as session:
             return get_state(session, 'trade_mode', self.settings.default_mode)
 
     def execute(self, req: TradeRequest) -> TradeResponse:
+        """Executes a trade request while enforcing local safety limits."""
         mode = self.current_mode()
 
         if req.quantity > self.settings.max_order_qty:
@@ -65,6 +72,7 @@ class TradeEngine:
         return TradeResponse(status='failed', message=error)
 
     def _log(self, req: TradeRequest, mode: str, status: str, order_id: str | None = None, note: str | None = None) -> None:
+        """Persists the outcome of a trade attempt to the local trade log."""
         with SessionLocal() as session:
             row = TradeLog(
                 symbol=req.symbol,

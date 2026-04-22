@@ -1,4 +1,6 @@
-﻿from __future__ import annotations
+"""Watchlist persistence and normalization helpers."""
+
+from __future__ import annotations
 
 from collections.abc import Iterable
 
@@ -20,11 +22,15 @@ SECTOR_TOP10 = {
 
 
 class WatchlistService:
+    """Manages the symbol universe stored in the local watchlist table."""
+
     def list_items(self) -> list[WatchlistItem]:
+        """Returns all watchlist rows ordered for display."""
         with SessionLocal() as session:
             return session.query(WatchlistItem).order_by(WatchlistItem.sector, WatchlistItem.symbol).all()
 
     def enabled_items(self) -> list[WatchlistItem]:
+        """Returns only the watchlist rows currently enabled for scanning."""
         with SessionLocal() as session:
             return session.query(WatchlistItem).filter(WatchlistItem.enabled == 'true').order_by(WatchlistItem.symbol).all()
 
@@ -36,6 +42,7 @@ class WatchlistService:
         exchange: str = 'NSE',
         symbol_token: str | None = None,
     ) -> bool:
+        """Adds a new symbol to the watchlist if it does not already exist."""
         normalized = symbol.strip().upper()
         if not normalized:
             return False
@@ -57,6 +64,7 @@ class WatchlistService:
             return True
 
     def remove_symbol(self, symbol: str) -> bool:
+        """Removes a symbol from the watchlist."""
         normalized = symbol.strip().upper()
         with SessionLocal() as session:
             row = session.query(WatchlistItem).filter(WatchlistItem.symbol == normalized).first()
@@ -67,6 +75,7 @@ class WatchlistService:
             return True
 
     def set_enabled(self, symbol: str, enabled: bool) -> bool:
+        """Toggles whether a watchlist symbol participates in scans."""
         normalized = symbol.strip().upper()
         with SessionLocal() as session:
             row = session.query(WatchlistItem).filter(WatchlistItem.symbol == normalized).first()
@@ -77,6 +86,7 @@ class WatchlistService:
             return True
 
     def update_token(self, symbol: str, exchange: str, symbol_token: str) -> None:
+        """Stores the latest broker-resolved exchange and symbol token."""
         normalized = symbol.strip().upper()
         with SessionLocal() as session:
             row = session.query(WatchlistItem).filter(WatchlistItem.symbol == normalized).first()
@@ -87,6 +97,7 @@ class WatchlistService:
             session.commit()
 
     def seed_sector_defaults(self, force: bool = False) -> int:
+        """Seeds the built-in sector starter symbols into the watchlist."""
         inserted = 0
         with SessionLocal() as session:
             if force:
@@ -117,6 +128,7 @@ class WatchlistService:
         return inserted
 
     def normalize_symbols(self) -> int:
+        """Migrates older `.NS` symbols into the repo's `-EQ` convention."""
         changed = 0
         with SessionLocal() as session:
             rows = session.query(WatchlistItem).all()
@@ -136,6 +148,7 @@ class WatchlistService:
         return changed
 
     def bulk_add(self, symbols: Iterable[str], sector: str = 'Custom', source: str = 'manual') -> int:
+        """Adds multiple symbols and returns how many were newly inserted."""
         added = 0
         for sym in symbols:
             if self.add_symbol(sym, sector=sector, source=source):

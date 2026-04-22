@@ -1,4 +1,6 @@
-﻿from __future__ import annotations
+"""Paper trading account, execution, and automation helpers."""
+
+from __future__ import annotations
 
 from datetime import datetime
 
@@ -8,12 +10,16 @@ from app.db import PaperAccount, PaperPosition, PaperTrade, SessionLocal
 
 
 class PaperTraderService:
+    """Simulates trading activity against the backend strategy outputs."""
+
     def __init__(self, strategy_service):
+        """Initializes the paper trader and its background scheduler."""
         self.strategy_service = strategy_service
         self.scheduler = BackgroundScheduler()
         self.scheduler.start()
 
     def reset_account(self, starting_cash: float) -> dict:
+        """Resets paper capital, positions, and trade history to a clean state."""
         with SessionLocal() as session:
             account = session.get(PaperAccount, 1)
             if account is None:
@@ -32,6 +38,7 @@ class PaperTraderService:
         return self.summary()
 
     def summary(self) -> dict:
+        """Builds the current paper account summary for web and mobile UIs."""
         auto_jobs = self.scheduler.get_jobs()
         with SessionLocal() as session:
             account = session.get(PaperAccount, 1)
@@ -93,6 +100,7 @@ class PaperTraderService:
             }
 
     def manual_trade(self, symbol: str, strategy: str, action: str = 'AUTO', amount: float = 0.0, refresh_signals: bool = False) -> dict:
+        """Runs a one-off paper trade using explicit or signal-derived direction."""
         candidates = self._strategy_rows(strategy, refresh_signals)
         row = next((r for r in candidates if r.get('symbol') == symbol), None)
         if row is None:
@@ -127,6 +135,7 @@ class PaperTraderService:
             return {'ok': True, 'message': 'Paper trade executed.', 'trade': result, 'summary': self.summary()}
 
     def start_auto(self, strategy: str, interval_minutes: int, max_trades_per_cycle: int, refresh_signals: bool = True) -> None:
+        """Starts interval-based automated paper trading."""
         self.scheduler.remove_all_jobs()
         self.scheduler.add_job(
             self._auto_cycle,
@@ -142,9 +151,11 @@ class PaperTraderService:
         )
 
     def stop_auto(self) -> None:
+        """Stops any scheduled paper-trading jobs."""
         self.scheduler.remove_all_jobs()
 
     def _auto_cycle(self, strategy: str, max_trades_per_cycle: int, refresh_signals: bool) -> None:
+        """Executes one automated paper-trading cycle."""
         rows = self._strategy_rows(strategy, refresh_signals)
         if not rows:
             return
@@ -173,6 +184,7 @@ class PaperTraderService:
             session.commit()
 
     def _strategy_rows(self, strategy: str, refresh_signals: bool) -> list[dict]:
+        """Loads normalized strategy rows from the selected backend scan."""
         strategy = strategy.lower().strip()
         if strategy == 'supertrend':
             hits, _ = self.strategy_service.scan_supertrend(force_refresh=refresh_signals)
@@ -218,6 +230,7 @@ class PaperTraderService:
         ]
 
     def _entry_price(self, row: dict) -> float:
+        """Chooses the best available entry proxy from a strategy row."""
         if row.get('close') and row.get('close') > 0:
             return float(row['close'])
         if row.get('support') and row.get('support') > 0:
@@ -227,6 +240,7 @@ class PaperTraderService:
         return 1.0
 
     def _optimize_quantity(self, cash: float, price: float, strength: float, trades_left: int, amount_override: float) -> int:
+        """Sizes a paper position from cash, conviction, and cycle capacity."""
         if price <= 0:
             return 0
 
@@ -241,6 +255,7 @@ class PaperTraderService:
         return max(0, min(qty, affordable))
 
     def _execute(self, session, account: PaperAccount, row: dict, side: str, qty: int, strategy: str) -> dict:
+        """Applies one paper buy or sell to account and position state."""
         symbol = row.get('symbol')
         price = self._entry_price(row)
         value = qty * price
@@ -300,6 +315,7 @@ class PaperTraderService:
         }
 
     def _latest_price_map(self) -> dict[str, float]:
+        """Builds a lightweight mark-price map from merged strategy output."""
         merged, err = self.strategy_service.scan_merged(force_refresh=False)
         if err:
             return {}
@@ -311,6 +327,7 @@ class PaperTraderService:
 
 
 def _signal_strength(signal: str) -> float:
+    """Maps signal labels to a coarse conviction score for sizing."""
     s = signal.upper().strip()
     if s == 'STRONG_BUY' or s == 'STRONG_SELL':
         return 0.95

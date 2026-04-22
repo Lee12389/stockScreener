@@ -7,6 +7,7 @@ import { useApiConfig } from '@/lib/api-config';
 import { formatNumber, formatSigned } from '@/lib/format';
 import { StrategyHit, StrategyKind, StrategyScanResponse } from '@/lib/types';
 
+/** Renders the backend strategy scan summaries for mobile and web. */
 export default function StrategiesScreen() {
   const { apiBaseUrl, ready } = useApiConfig();
   const [strategy, setStrategy] = useState<StrategyKind>('merged');

@@ -1,18 +1,25 @@
-﻿from datetime import datetime
+"""Dashboard performer ranking and suggestion helpers."""
+
+from datetime import datetime
 
 from app.config import get_settings
 from app.models import Performer, Suggestion, SuggestionResponse
 
 
 class AnalysisService:
+    """Builds simple performer and suggestion views from broker data."""
+
     def __init__(self, angel_client):
+        """Stores the broker client and app thresholds used for analysis."""
         self.angel_client = angel_client
         self.settings = get_settings()
 
     def top_performers(self) -> list[Performer]:
+        """Returns top performers for the configured default watchlist."""
         return self.top_performers_from_symbols(self.settings.watchlist_symbols)
 
     def top_performers_from_symbols(self, symbols: list[str]) -> list[Performer]:
+        """Fetches and normalizes top performers for an explicit symbol set."""
         rows = self.angel_client.fetch_top_performers(
             top_n=self.settings.top_n,
             watchlist_symbols=symbols,
@@ -28,6 +35,7 @@ class AnalysisService:
         ]
 
     def suggestions(self, performers: list[Performer]) -> SuggestionResponse:
+        """Converts performer momentum into BUY, SELL, or HOLD suggestions."""
         suggestions: list[Suggestion] = []
         for p in performers:
             change = p.change_pct if p.change_pct is not None else 0.0

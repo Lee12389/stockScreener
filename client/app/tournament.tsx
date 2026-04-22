@@ -7,6 +7,7 @@ import { useApiConfig } from '@/lib/api-config';
 import { formatCompactCurrency, formatNumber, formatTimestamp } from '@/lib/format';
 import { TournamentBoard } from '@/lib/types';
 
+/** Renders the tournament leaderboard and bot controls. */
 export default function TournamentScreen() {
   const { apiBaseUrl, ready } = useApiConfig();
   const [board, setBoard] = useState<TournamentBoard | null>(null);

@@ -31,6 +31,7 @@ export const palette = {
   border: '#dcc9a9',
 };
 
+/** Wraps a screen in the shared gradient hero and scrolling layout. */
 export function ScreenScroll({
   title,
   subtitle,
@@ -55,6 +56,7 @@ export function ScreenScroll({
   );
 }
 
+/** Renders a reusable elevated content card with header copy. */
 export function SectionCard({
   title,
   subtitle,
@@ -74,6 +76,7 @@ export function SectionCard({
   );
 }
 
+/** Displays a responsive grid of headline metrics. */
 export function MetricGrid({ items }: { items: Array<{ label: string; value: string; tone?: 'default' | 'good' | 'warn' | 'danger' }> }) {
   return (
     <View style={styles.metricGrid}>
@@ -95,6 +98,7 @@ export function MetricGrid({ items }: { items: Array<{ label: string; value: str
   );
 }
 
+/** Wraps a form control with its label. */
 export function Field({
   label,
   children,
@@ -107,6 +111,7 @@ export function Field({
   );
 }
 
+/** Renders the shared text input style used across forms. */
 export function AppInput(props: TextInputProps) {
   return (
     <TextInput
@@ -117,6 +122,7 @@ export function AppInput(props: TextInputProps) {
   );
 }
 
+/** Renders the shared primary, secondary, or danger button styles. */
 export function AppButton({
   label,
   onPress,
@@ -142,6 +148,7 @@ export function AppButton({
   );
 }
 
+/** Renders a pill-style toggle button. */
 export function ChipButton({
   label,
   active,
@@ -158,10 +165,12 @@ export function ChipButton({
   );
 }
 
+/** Lays out chip buttons with wrapping support. */
 export function ChipRow({ children }: PropsWithChildren) {
   return <View style={styles.chipRow}>{children}</View>;
 }
 
+/** Shows contextual feedback such as success, warning, or error messages. */
 export function InlineMessage({
   tone = 'default',
   text,
@@ -182,6 +191,7 @@ export function InlineMessage({
   );
 }
 
+/** Displays a compact labeled metric pill. */
 export function DataPill({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.dataPill}>
@@ -191,6 +201,7 @@ export function DataPill({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** Displays an empty-state message when a section has no data. */
 export function EmptyState({
   title,
   subtitle,
@@ -206,6 +217,7 @@ export function EmptyState({
   );
 }
 
+/** Displays a centered loading indicator and message. */
 export function LoadingBlock({ label }: { label: string }) {
   return (
     <View style={styles.loadingBlock}>
@@ -215,6 +227,7 @@ export function LoadingBlock({ label }: { label: string }) {
   );
 }
 
+/** Lays out left and right row content for list-like screens. */
 export function Row({ left, right }: { left: ReactNode; right?: ReactNode }) {
   return (
     <View style={styles.row}>
@@ -224,10 +237,12 @@ export function Row({ left, right }: { left: ReactNode; right?: ReactNode }) {
   );
 }
 
+/** Renders a thin divider between repeated list items. */
 export function ListDivider() {
   return <View style={styles.divider} />;
 }
 
+/** Maps signals and message tones to shared palette colors. */
 export function toneColor(signal: string) {
   if (signal.includes('STRONG_BUY') || signal === 'BUY') {
     return palette.success;

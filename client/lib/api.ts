@@ -17,6 +17,7 @@ type RequestInitWithJson = RequestInit & {
   json?: unknown;
 };
 
+/** Runs a JSON request against the FastAPI backend and normalizes errors. */
 async function request<T>(baseUrl: string, path: string, init: RequestInitWithJson = {}): Promise<T> {
   const headers = new Headers(init.headers || {});
   const finalInit: RequestInit = {
@@ -44,6 +45,7 @@ async function request<T>(baseUrl: string, path: string, init: RequestInitWithJs
   return data as T;
 }
 
+/** Central API client used by the shared Expo screens. */
 export const api = {
   health(baseUrl: string) {
     return request<{ status: string; app: string }>(baseUrl, '/api/health');

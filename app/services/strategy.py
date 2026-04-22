@@ -1,4 +1,6 @@
-﻿from __future__ import annotations
+﻿"""Market-data loading, indicator calculation, and strategy scan helpers."""
+
+from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -6,6 +8,8 @@ from datetime import datetime, timedelta
 
 @dataclass
 class RsiHit:
+    """Represents a bullish multi-timeframe RSI setup."""
+
     symbol: str
     exchange: str
     sector: str
@@ -24,6 +28,8 @@ class RsiHit:
 
 @dataclass
 class SupertrendHit:
+    """Represents a Supertrend-driven directional setup."""
+
     symbol: str
     exchange: str
     sector: str
@@ -40,6 +46,8 @@ class SupertrendHit:
 
 @dataclass
 class MergedHit:
+    """Represents the merged view of RSI and Supertrend signals."""
+
     symbol: str
     exchange: str
     sector: str
@@ -60,7 +68,10 @@ class MergedHit:
 
 
 class StrategyService:
+    """Loads market data and exposes scanner-friendly strategy outputs."""
+
     def __init__(self, angel_client, watchlist_service):
+        """Initializes broker access, watchlist access, and in-memory caches."""
         self.angel_client = angel_client
         self.watchlist_service = watchlist_service
         self.cache_ttl = timedelta(minutes=5)
@@ -68,6 +79,7 @@ class StrategyService:
         self._dataset_cache: dict[str, tuple[datetime, list[dict], str | None]] = {}
 
     def scan_rsa_flow(self, force_refresh: bool = False) -> tuple[list[RsiHit], str | None]:
+        """Builds bullish RSI flow setups from the current market snapshot."""
         market, error = self._load_market_data(force_refresh=force_refresh)
         if error:
             return [], error
@@ -145,6 +157,7 @@ class StrategyService:
         macd_slow: int = 26,
         macd_signal: int = 9,
         ) -> tuple[dict[str, dict], str | None]:
+        """Returns the normalized market snapshot used by scanners and bots."""
         return self._load_market_data(
             force_refresh=force_refresh,
             interval=interval,
@@ -162,6 +175,7 @@ class StrategyService:
         interval: str = 'FIFTEEN_MINUTE',
         daily_days: int = 320,
     ) -> tuple[list[dict], str | None]:
+        """Builds the raw candle dataset consumed by frontend scanner clients."""
         normalized_interval = _normalize_interval(interval)
         normalized = sorted({s.strip().upper() for s in symbols if s and s.strip()})
         if not normalized:
@@ -242,6 +256,7 @@ class StrategyService:
         daily_days: int,
         dataset_mode: bool = False,
     ) -> tuple[list[dict], list[dict]]:
+        """Fetches primary candles plus the daily source candles used for aggregation."""
         normalized_interval = _normalize_interval(interval)
 
         if normalized_interval in {'ONE_WEEK', 'ONE_MONTH'}:
@@ -277,6 +292,7 @@ class StrategyService:
         return primary, daily_source
 
     def scan_supertrend(self, force_refresh: bool = False) -> tuple[list[SupertrendHit], str | None]:
+        """Builds Supertrend-based directional setups from market data."""
         market, error = self._load_market_data(force_refresh=force_refresh)
         if error:
             return [], error
@@ -311,6 +327,7 @@ class StrategyService:
         return hits, None
 
     def scan_merged(self, force_refresh: bool = False) -> tuple[list[MergedHit], str | None]:
+        """Combines RSI and Supertrend outputs into one ranked signal set."""
         rsi_hits, error = self.scan_rsa_flow(force_refresh=force_refresh)
         if error:
             return [], error
@@ -370,6 +387,7 @@ class StrategyService:
         macd_slow: int = 26,
         macd_signal: int = 9,
     ) -> tuple[dict[str, dict], str | None]:
+        """Loads, caches, and normalizes market data for enabled watchlist symbols."""
         normalized_interval = _normalize_interval(interval)
         cache_key = ':'.join(
             [
@@ -512,6 +530,7 @@ class StrategyService:
 
 
 def _rsi_series(closes: list[float], period: int = 14) -> list[float]:
+    """Calculates a Wilder-style RSI series for the supplied closes."""
     if len(closes) < period + 1:
         return []
 
@@ -539,6 +558,7 @@ def _rsi_series(closes: list[float], period: int = 14) -> list[float]:
 
 
 def _ema(values: list[float], period: int) -> list[float]:
+    """Calculates an exponential moving average series."""
     if not values:
         return []
     alpha = 2.0 / (period + 1)
@@ -549,6 +569,7 @@ def _ema(values: list[float], period: int) -> list[float]:
 
 
 def _macd(values: list[float], fast: int = 12, slow: int = 26, signal: int = 9) -> tuple[list[float], list[float], list[float]]:
+    """Calculates MACD, its signal line, and histogram values."""
     if not values:
         return [], [], []
     fast_ema = _ema(values, max(2, fast))
@@ -560,6 +581,7 @@ def _macd(values: list[float], fast: int = 12, slow: int = 26, signal: int = 9) 
 
 
 def _supertrend(highs: list[float], lows: list[float], closes: list[float], period: int = 10, multiplier: float = 3.0):
+    """Calculates the Supertrend line and final bullish state."""
     trs: list[float] = []
     for i in range(len(closes)):
         if i == 0:
@@ -607,6 +629,7 @@ def _supertrend(highs: list[float], lows: list[float], closes: list[float], peri
 
 
 def _merge_signal(rsi_action: str, super_signal: str) -> str:
+    """Combines RSI and Supertrend actions into one merged signal."""
     if super_signal in {'STRONG_BUY', 'STRONG_SELL'}:
         return super_signal
     if super_signal == 'BUY' and rsi_action == 'BUY':
@@ -621,11 +644,13 @@ def _merge_signal(rsi_action: str, super_signal: str) -> str:
 
 
 def _signal_rank(signal: str) -> int:
+    """Assigns an ordering rank so merged signals can be sorted."""
     order = {'STRONG_BUY': 5, 'BUY': 4, 'HOLD': 3, 'SELL': 2, 'STRONG_SELL': 1}
     return order.get(signal, 0)
 
 
 def _normalize_interval(interval: str) -> str:
+    """Normalizes interval aliases into backend-supported constants."""
     normalized = (interval or 'ONE_DAY').strip().upper()
     aliases = {
         'WEEKLY': 'ONE_WEEK',
@@ -635,6 +660,7 @@ def _normalize_interval(interval: str) -> str:
 
 
 def _minimum_candles_for_interval(interval: str) -> int:
+    """Returns the minimum candle count required for a scan interval."""
     normalized = _normalize_interval(interval)
     mapping = {
         'FIVE_MINUTE': 120,
@@ -648,6 +674,7 @@ def _minimum_candles_for_interval(interval: str) -> int:
 
 
 def _source_days_for_interval(interval: str, dataset_mode: bool = False) -> int:
+    """Returns how many broker days to request for the primary interval."""
     normalized = _normalize_interval(interval)
     if dataset_mode:
         mapping = {
@@ -667,6 +694,7 @@ def _source_days_for_interval(interval: str, dataset_mode: bool = False) -> int:
 
 
 def _daily_source_days_for_interval(interval: str, daily_days: int) -> int:
+    """Returns how many daily candles are needed for long-term aggregation."""
     normalized = _normalize_interval(interval)
     if normalized == 'ONE_WEEK':
         return max(daily_days, 1500)
@@ -676,6 +704,7 @@ def _daily_source_days_for_interval(interval: str, daily_days: int) -> int:
 
 
 def _aggregate_candles(candles: list[dict], mode: str) -> list[dict]:
+    """Aggregates daily candles into weekly or monthly OHLCV buckets."""
     buckets: dict[str, dict] = {}
     order: list[str] = []
     for candle in candles:
@@ -711,6 +740,7 @@ def _aggregate_candles(candles: list[dict], mode: str) -> list[dict]:
 
 
 def _aggregate_last_close(candles: list[dict], mode: str) -> list[float]:
+    """Aggregates only the final close of each weekly or monthly bucket."""
     buckets: dict[str, float] = {}
     for c in candles:
         ts = str(c.get('ts', ''))
@@ -727,6 +757,7 @@ def _aggregate_last_close(candles: list[dict], mode: str) -> list[float]:
 
 
 def _parse_ts(ts: str) -> datetime | None:
+    """Parses broker timestamps used throughout the strategy service."""
     for fmt in ('%Y-%m-%dT%H:%M:%S%z', '%Y-%m-%d %H:%M', '%Y-%m-%dT%H:%M:%S'):
         try:
             return datetime.strptime(ts, fmt)
@@ -736,6 +767,7 @@ def _parse_ts(ts: str) -> datetime | None:
 
 
 def _pack_candles(candles: list[dict]) -> list[list[float | str]]:
+    """Compacts candle dictionaries into list payloads for API responses."""
     packed: list[list[float | str]] = []
     for candle in candles:
         packed.append(
@@ -752,6 +784,7 @@ def _pack_candles(candles: list[dict]) -> list[list[float | str]]:
 
 
 def _sparkline_points(values: list[float]) -> str:
+    """Converts numeric values into a lightweight sparkline polyline string."""
     if not values:
         return ''
     vmin = min(values)

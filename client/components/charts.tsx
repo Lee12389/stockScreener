@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Candle } from '@/lib/types';
 import { palette } from '@/components/ui';
 
+/** Renders a lightweight line sparkline for scanner cards. */
 export function Sparkline({
   values,
   color = palette.teal,
@@ -23,6 +24,7 @@ export function Sparkline({
   );
 }
 
+/** Renders the expanded multi-line price chart used in scanner detail views. */
 export function PriceChart({
   candles,
   close,
@@ -86,6 +88,7 @@ export function PriceChart({
   );
 }
 
+/** Renders a small legend swatch and label pair. */
 function LegendDot({ color, label }: { color: string; label: string }) {
   return (
     <View style={styles.legendItem}>
@@ -95,6 +98,7 @@ function LegendDot({ color, label }: { color: string; label: string }) {
   );
 }
 
+/** Converts numeric series values into SVG point coordinates. */
 function buildPoints(values: number[], width: number, height: number) {
   if (!values.length) {
     return '0,0';

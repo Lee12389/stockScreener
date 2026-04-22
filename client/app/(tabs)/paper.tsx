@@ -7,6 +7,7 @@ import { useApiConfig } from '@/lib/api-config';
 import { formatCompactCurrency, formatNumber, formatTimestamp } from '@/lib/format';
 import { PaperSummary, StrategyKind } from '@/lib/types';
 
+/** Renders the paper trading workflow and account summary. */
 export default function PaperScreen() {
   const { apiBaseUrl, ready } = useApiConfig();
   const [summary, setSummary] = useState<PaperSummary | null>(null);
@@ -28,6 +29,7 @@ export default function PaperScreen() {
     void load();
   }, [ready, apiBaseUrl]);
 
+  /** Loads the latest paper account summary from the backend. */
   async function load() {
     setBusy(true);
     setError('');
@@ -42,6 +44,7 @@ export default function PaperScreen() {
     }
   }
 
+  /** Resets the paper account to the requested starting cash. */
   async function resetAccount() {
     setBusy(true);
     setError('');
@@ -57,6 +60,7 @@ export default function PaperScreen() {
     }
   }
 
+  /** Runs one manual or AUTO-driven paper trade. */
   async function runTrade() {
     if (!symbol.trim()) {
       return;
@@ -80,6 +84,7 @@ export default function PaperScreen() {
     }
   }
 
+  /** Starts the scheduled paper-trading bot. */
   async function startAuto() {
     setBusy(true);
     setError('');
@@ -99,6 +104,7 @@ export default function PaperScreen() {
     }
   }
 
+  /** Stops the scheduled paper-trading bot. */
   async function stopAuto() {
     setBusy(true);
     setError('');

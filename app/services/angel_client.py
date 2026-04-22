@@ -1,4 +1,6 @@
-﻿from __future__ import annotations
+"""Angel One SmartAPI integration helpers."""
+
+from __future__ import annotations
 
 from datetime import datetime, timedelta
 from typing import Any
@@ -14,13 +16,17 @@ except Exception:  # pragma: no cover
 
 
 class AngelClient:
+    """Wraps the broker SDK with connection and candle convenience helpers."""
+
     def __init__(self) -> None:
+        """Initializes the client with empty connection state."""
         self.settings = get_settings()
         self.client = None
         self.connected = False
         self.last_error = ''
 
     def connect(self) -> tuple[bool, str]:
+        """Opens a SmartAPI session using the configured credentials."""
         if SmartConnect is None:
             self.last_error = 'smartapi-python is not available. Install dependencies first.'
             return False, self.last_error
@@ -56,14 +62,17 @@ class AngelClient:
             return False, self.last_error
 
     def ensure_connected(self) -> tuple[bool, str]:
+        """Returns an active broker session, connecting on demand if needed."""
         if self.is_connected():
             return True, 'already connected'
         return self.connect()
 
     def is_connected(self) -> bool:
+        """Reports whether the SDK client is ready for broker calls."""
         return self.connected and self.client is not None
 
     def _safe_call(self, method_name: str, *args, **kwargs) -> Any:
+        """Calls a SmartAPI method only when the client is connected."""
         if not self.is_connected():
             raise RuntimeError('Angel client is not connected.')
         method = getattr(self.client, method_name, None)
@@ -72,6 +81,7 @@ class AngelClient:
         return method(*args, **kwargs)
 
     def resolve_symbol_token(self, exchange: str, symbol: str) -> tuple[str | None, str | None]:
+        """Resolves a broker symbol token for the supplied trading symbol."""
         ex = exchange.strip().upper() or 'NSE'
         candidates = self._search_candidates(symbol)
 
@@ -102,6 +112,7 @@ class AngelClient:
         days: int = 730,
         interval: str = 'ONE_DAY',
     ) -> list[dict[str, float | str]]:
+        """Fetches normalized OHLCV candles for a symbol and interval."""
         to_dt = datetime.now()
         from_dt = to_dt - timedelta(days=days)
         params = {
@@ -131,6 +142,7 @@ class AngelClient:
         return candles
 
     def fetch_top_performers(self, top_n: int, watchlist_symbols: list[str]) -> list[dict[str, Any]]:
+        """Fetches a best-effort top-performer set from broker data."""
         try:
             data = self._safe_call('gainersLosers', {'datatype': 'PercOIGainers'})
             rows = data.get('data') or []
@@ -172,6 +184,7 @@ class AngelClient:
 
     @staticmethod
     def _search_candidates(symbol: str) -> list[str]:
+        """Builds alternate symbol spellings for broker search fallback."""
         s = symbol.strip().upper()
         cands: list[str] = []
         if s:
@@ -193,6 +206,7 @@ class AngelClient:
 
 
 def _as_float(value: Any) -> float | None:
+    """Safely converts broker response values into floats."""
     try:
         if value is None or value == '':
             return None

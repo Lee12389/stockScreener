@@ -1,3 +1,5 @@
+"""Prunes stale SQLite rows and temporary local cache artifacts."""
+
 from __future__ import annotations
 
 import argparse
@@ -19,11 +21,14 @@ DEFAULT_BOT_TRADE_DAYS = 365
 
 @dataclass
 class CleanupResult:
+    """Captures the label and removal count for one cleanup action."""
+
     label: str
     removed: int
 
 
 def parse_args() -> argparse.Namespace:
+    """Parses command-line arguments for the cleanup utility."""
     parser = argparse.ArgumentParser(description='Prune stale local SQLite data and temp caches.')
     parser.add_argument('--db', default=str(DB_PATH), help='Path to the SQLite database.')
     parser.add_argument('--scan-cache-days', type=int, default=DEFAULT_SCAN_CACHE_DAYS, help='Keep scanner result cache newer than this many days.')
@@ -37,6 +42,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    """Runs the cleanup workflow and prints a human-readable summary."""
     args = parse_args()
     db_path = Path(args.db).resolve()
     if not db_path.exists():
@@ -83,6 +89,7 @@ def main() -> int:
 
 
 def existing_tables(conn: sqlite3.Connection) -> set[str]:
+    """Returns the set of table names currently present in SQLite."""
     rows = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
     return {str(row['name']) for row in rows}
 
@@ -97,6 +104,7 @@ def prune_older_than(
     label: str,
     dry_run: bool,
 ) -> CleanupResult:
+    """Deletes rows older than the requested retention window."""
     if table not in tables:
         return CleanupResult(label, 0)
     cutoff = (datetime.now(timezone.utc) - timedelta(days=max(days, 1))).strftime('%Y-%m-%d %H:%M:%S')
@@ -115,6 +123,7 @@ def prune_where(
     label: str,
     dry_run: bool,
 ) -> CleanupResult:
+    """Deletes rows matching an explicit cleanup predicate."""
     if table not in tables:
         return CleanupResult(label, 0)
     count = conn.execute(f'SELECT COUNT(*) AS total FROM {table} WHERE {where_clause}').fetchone()['total']
@@ -124,6 +133,7 @@ def prune_where(
 
 
 def cleanup_temp_dirs(root: Path, *, dry_run: bool) -> list[CleanupResult]:
+    """Removes transient cache folders and compiled Python artifacts."""
     targets = ['__pycache__', '.pytest_cache']
     results: list[CleanupResult] = []
     for target in targets:

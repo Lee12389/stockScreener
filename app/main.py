@@ -1,4 +1,6 @@
-﻿from pathlib import Path
+﻿"""FastAPI application wiring for APIs, web pages, and shared services."""
+
+from pathlib import Path
 
 from fastapi import FastAPI, Form, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -72,6 +74,7 @@ def startup() -> None:
     watchlist_service.normalize_symbols()
 
 
+# API: health, broker session, and dashboard state.
 @app.get('/api/health')
 def health() -> dict:
     return {'status': 'ok', 'app': settings.app_name}
@@ -169,6 +172,7 @@ def stop_automation() -> dict:
     return {'ok': True, 'message': 'Automation stopped.'}
 
 
+# API: paper trading.
 @app.get('/api/paper/summary')
 def api_paper_summary() -> dict:
     return paper_trader.summary()
@@ -208,6 +212,7 @@ def api_paper_auto_stop() -> dict:
     return {'ok': True, 'message': 'Paper auto-trader stopped.'}
 
 
+# API: strategy tournament.
 @app.post('/api/tournament/init')
 def api_tournament_init(req: TournamentInitRequest) -> dict:
     board = tournament_service.setup_bots(capital=req.starting_capital)
@@ -236,6 +241,7 @@ def api_tournament_leaderboard() -> dict:
     return tournament_service.leaderboard()
 
 
+# API: scanner datasets, config, and bought monitor.
 @app.get('/api/scanner/config')
 def api_scanner_config() -> dict:
     return scanner_service.get_config()
@@ -303,6 +309,7 @@ def api_scanner_bought_monitor(refresh: bool = Query(default=False)) -> dict:
     return scanner_service.monitor_bought(force_refresh=refresh)
 
 
+# API: options strategy lab.
 @app.post('/api/options/recommend')
 def api_options_recommend(req: OptionsLabRequest) -> dict:
     rows = options_service.parse_rows(req.option_rows_csv)
@@ -322,6 +329,7 @@ def api_options_custom(req: OptionsCustomRequest) -> dict:
     )
 
 
+# API: watchlist management and strategy scans.
 @app.get('/api/watchlist')
 def api_watchlist() -> list[dict]:
     rows = watchlist_service.list_items()
@@ -408,6 +416,7 @@ def api_strategy_scan_compat(
     )
 
 
+# Web pages.
 @app.get('/', response_class=HTMLResponse)
 def dashboard(request: Request, refresh: bool = Query(default=False)):
     performers = []
@@ -549,6 +558,7 @@ def options_lab_page(request: Request):
     )
 
 
+# Web form posts.
 @app.post('/paper/fund')
 def paper_fund(starting_cash: float = Form(...)):
     paper_trader.reset_account(starting_cash)
@@ -790,6 +800,7 @@ def dashboard_connect():
 
 
 def _get_strategy_rows(strategy: str, refresh: bool):
+    """Loads normalized rows for the requested strategy page or API view."""
     strategy = (strategy or 'rsi').lower().strip()
     if strategy == 'supertrend':
         hits, error = strategy_service.scan_supertrend(force_refresh=refresh)
@@ -863,6 +874,7 @@ def _get_strategy_rows(strategy: str, refresh: bool):
 
 
 def _filter_rows(rows, sector: str, trigger: str, signal: str, min_change_pct: float, min_daily_rsi: float):
+    """Applies the common strategy filters used by web and API responses."""
     out = []
     for r in rows:
         if sector != 'all' and r.get('sector') != sector:

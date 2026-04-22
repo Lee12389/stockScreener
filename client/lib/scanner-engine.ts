@@ -17,6 +17,7 @@ export const PRESET_LABELS: Record<PresetKey, string> = {
 
 export type ChartTimeframe = 'primary' | 'daily' | 'weekly' | 'monthly';
 
+/** Converts raw dataset items into ranked scanner rows for the UI. */
 export function buildScannerRows(items: ScannerDatasetItem[], config: ScannerConfig, boughtRows: BoughtInfo[] = []): ScannerRow[] {
   const boughtMap = new Map(boughtRows.map((row) => [row.symbol.toUpperCase(), row]));
   return items
@@ -24,6 +25,7 @@ export function buildScannerRows(items: ScannerDatasetItem[], config: ScannerCon
     .sort((left, right) => right.score - left.score);
 }
 
+/** Reports whether a scanner row matches the selected preset bucket. */
 export function matchesPreset(row: ScannerRow, preset: PresetKey) {
   if (preset === 'all') {
     return true;
@@ -31,6 +33,7 @@ export function matchesPreset(row: ScannerRow, preset: PresetKey) {
   return row.scans.includes(PRESET_LABELS[preset]);
 }
 
+/** Formats backend interval constants into human-friendly labels. */
 export function intervalLabelFor(value: string): string {
   const labels: Record<string, string> = {
     FIVE_MINUTE: '5m',
@@ -43,6 +46,7 @@ export function intervalLabelFor(value: string): string {
   return labels[(value || '').toUpperCase()] || value || '15m';
 }
 
+/** Builds the candle and moving-average series used in detail charts. */
 export function buildChartSeries(row: ScannerRow, timeframe: ChartTimeframe = 'primary') {
   let candles = row.candles;
   if (timeframe === 'daily') {
@@ -73,6 +77,7 @@ export function buildChartSeries(row: ScannerRow, timeframe: ChartTimeframe = 'p
   };
 }
 
+/** Calculates all derived scanner metrics for one dataset item. */
 function buildRowSummary(item: ScannerDatasetItem, config: ScannerConfig, boughtInfo: BoughtInfo | null): ScannerRow {
   const candles = normalizeCandles(item.candles || []);
   const dailyCandles = normalizeCandles((item.daily_candles && item.daily_candles.length ? item.daily_candles : item.candles) || []);
@@ -354,6 +359,7 @@ function buildRowSummary(item: ScannerDatasetItem, config: ScannerConfig, bought
   return row;
 }
 
+/** Evaluates a tracked row for weak or strong reversal conditions. */
 function evaluateBoughtReversal(row: ScannerRow) {
   if (!row.isBought) {
     return { state: 'NOT_TRACKED', reasons: [] as string[] };
@@ -388,6 +394,7 @@ function evaluateBoughtReversal(row: ScannerRow) {
   return { state: 'HOLD', reasons: ['Trend is still healthy.'] };
 }
 
+/** Coerces candle inputs into a consistently numeric shape. */
 function normalizeCandles(candles: Candle[]): Candle[] {
   return (candles || []).map((candle) => ({
     ts: String(candle.ts),
@@ -399,19 +406,23 @@ function normalizeCandles(candles: Candle[]): Candle[] {
   }));
 }
 
+/** Safely converts arbitrary values into numbers with a fallback. */
 function safeNumber(value: unknown, fallback = 0): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+/** Rounds a number to the requested decimal precision. */
 function roundNumber(value: number, digits = 2) {
   return Number(value.toFixed(digits));
 }
 
+/** Clamps a number into the supplied range. */
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
+/** Averages only the finite numeric values in a mixed array. */
 function average(values: Array<number | null | undefined>) {
   const filtered = values.filter((value): value is number => Number.isFinite(value as number));
   if (!filtered.length) {
@@ -420,6 +431,7 @@ function average(values: Array<number | null | undefined>) {
   return filtered.reduce((sum, value) => sum + value, 0) / filtered.length;
 }
 
+/** Returns the final array element or a fallback when empty. */
 function last<T>(values: T[], fallback?: T): T {
   if (!values.length) {
     return fallback as T;
@@ -427,6 +439,7 @@ function last<T>(values: T[], fallback?: T): T {
   return values[values.length - 1];
 }
 
+/** Returns the last finite numeric value in a series. */
 function lastNumber(values: Array<number | null | undefined>, fallback = 0) {
   for (let index = values.length - 1; index >= 0; index -= 1) {
     const value = values[index];
@@ -437,16 +450,19 @@ function lastNumber(values: Array<number | null | undefined>, fallback = 0) {
   return fallback;
 }
 
+/** Returns the maximum finite numeric value in a series. */
 function maxValue(values: Array<number | null | undefined>, fallback = 0) {
   const filtered = values.filter((value): value is number => Number.isFinite(value as number));
   return filtered.length ? Math.max(...filtered) : fallback;
 }
 
+/** Returns the minimum finite numeric value in a series. */
 function minValue(values: Array<number | null | undefined>, fallback = 0) {
   const filtered = values.filter((value): value is number => Number.isFinite(value as number));
   return filtered.length ? Math.min(...filtered) : fallback;
 }
 
+/** Calculates percentage change between two prices. */
 function percentChange(current: number, previous: number) {
   if (!previous) {
     return 0;
@@ -454,6 +470,7 @@ function percentChange(current: number, previous: number) {
   return ((current - previous) / previous) * 100;
 }
 
+/** Parses backend candle timestamps into JavaScript dates. */
 function parseDate(value: string): Date | null {
   const direct = new Date(value);
   if (!Number.isNaN(direct.getTime())) {
@@ -464,6 +481,7 @@ function parseDate(value: string): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+/** Builds the aggregation bucket key for a date and timeframe mode. */
 function bucketKeyForDate(date: Date, mode: 'week' | 'month') {
   if (mode === 'week') {
     return isoWeekKey(date);
@@ -471,6 +489,7 @@ function bucketKeyForDate(date: Date, mode: 'week' | 'month') {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
+/** Builds an ISO week identifier for weekly aggregation. */
 function isoWeekKey(date: Date) {
   const utc = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
   const day = utc.getUTCDay() || 7;
@@ -480,6 +499,7 @@ function isoWeekKey(date: Date) {
   return `${utc.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
 }
 
+/** Aggregates close values into weekly or monthly buckets. */
 function aggregateCloseByBucket(candles: Candle[], mode: 'week' | 'month') {
   const buckets = new Map<string, number>();
   candles.forEach((candle) => {
@@ -492,6 +512,7 @@ function aggregateCloseByBucket(candles: Candle[], mode: 'week' | 'month') {
   return Array.from(buckets.values());
 }
 
+/** Aggregates full candles into weekly or monthly OHLCV buckets. */
 function aggregateCandlesByBucket(candles: Candle[], mode: 'week' | 'month') {
   const buckets = new Map<string, Candle>();
   const order: string[] = [];
@@ -525,6 +546,7 @@ function aggregateCandlesByBucket(candles: Candle[], mode: 'week' | 'month') {
   return order.map((key) => buckets.get(key) as Candle);
 }
 
+/** Calculates an exponential moving average series. */
 function emaSeries(values: number[], period: number) {
   if (!values.length) {
     return [] as number[];
@@ -537,6 +559,7 @@ function emaSeries(values: number[], period: number) {
   return output;
 }
 
+/** Calculates a simple moving average series. */
 function smaSeries(values: number[], period: number) {
   const output: Array<number | null> = [];
   let sum = 0;
@@ -550,6 +573,7 @@ function smaSeries(values: number[], period: number) {
   return output;
 }
 
+/** Calculates an RSI series for the supplied closes. */
 function rsiSeries(values: number[], period: number) {
   if (values.length < period + 1) {
     return values.map(() => 50);
@@ -579,6 +603,7 @@ function rsiSeries(values: number[], period: number) {
   return output.slice(-values.length);
 }
 
+/** Calculates MACD, signal, and histogram series. */
 function macdSeries(values: number[], fast: number, slow: number, signal: number) {
   const fastEma = emaSeries(values, Math.max(2, fast));
   const slowEma = emaSeries(values, Math.max(3, slow));
@@ -588,6 +613,7 @@ function macdSeries(values: number[], fast: number, slow: number, signal: number
   return { macd, signal: signalSeries, hist };
 }
 
+/** Calculates an Average True Range series. */
 function atrSeries(highs: number[], lows: number[], closes: number[], period: number) {
   const tr: number[] = [];
   for (let index = 0; index < closes.length; index += 1) {
@@ -616,6 +642,7 @@ function atrSeries(highs: number[], lows: number[], closes: number[], period: nu
   return atr;
 }
 
+/** Calculates a simplified ADX trend-strength series. */
 function adxSeries(highs: number[], lows: number[], closes: number[], period: number) {
   if (closes.length < period + 1) {
     return closes.map(() => 10);
@@ -644,6 +671,7 @@ function adxSeries(highs: number[], lows: number[], closes: number[], period: nu
   return emaSeries(dx, period);
 }
 
+/** Calculates stochastic oscillator K and D series. */
 function stochasticSeries(highs: number[], lows: number[], closes: number[], period: number, smooth: number) {
   const k = closes.map((_, index) => {
     const start = Math.max(0, index - period + 1);
@@ -658,6 +686,7 @@ function stochasticSeries(highs: number[], lows: number[], closes: number[], per
   };
 }
 
+/** Calculates Bollinger band and width series. */
 function bollingerSeries(values: number[], period: number, multiplier: number) {
   const middle = smaSeries(values, period);
   const upper: Array<number | null> = [];
@@ -681,6 +710,7 @@ function bollingerSeries(values: number[], period: number, multiplier: number) {
   return { middle, upper, lower, width };
 }
 
+/** Calculates a client-side Supertrend line and bullish state series. */
 function supertrendSeries(highs: number[], lows: number[], closes: number[], period: number, multiplier: number) {
   const atr = atrSeries(highs, lows, closes, period);
   const upperBasic = highs.map((high, index) => ((high + lows[index]) / 2) + multiplier * atr[index]);
@@ -718,6 +748,7 @@ function supertrendSeries(highs: number[], lows: number[], closes: number[], per
   return { line, bullish };
 }
 
+/** Calculates the cumulative VWAP series for a candle set. */
 function vwapSeries(candles: Candle[]) {
   let pv = 0;
   let vv = 0;

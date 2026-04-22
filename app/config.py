@@ -1,4 +1,6 @@
-﻿from functools import lru_cache
+"""Application settings helpers and defaults loading."""
+
+from functools import lru_cache
 from pathlib import Path
 from typing import List
 
@@ -8,6 +10,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    """Runtime settings loaded from env vars, `.env`, and fallback defaults."""
+
     model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8', case_sensitive=False)
 
     app_name: str = Field(default='Angel One AutoTrader', alias='APP_NAME')
@@ -35,15 +39,18 @@ class Settings(BaseSettings):
 
     @property
     def watchlist_symbols(self) -> List[str]:
+        """Returns the configured watchlist symbols as a normalized list."""
         return [s.strip() for s in self.watchlist.split(',') if s.strip()]
 
     @property
     def cors_origin_list(self) -> List[str]:
+        """Returns the CORS origin allowlist as a non-empty list."""
         raw = [s.strip() for s in self.cors_origins.split(',') if s.strip()]
         return raw or ['*']
 
 
 def _load_defaults_yaml() -> dict:
+    """Loads optional fallback values from `defaults.yaml` when present."""
     cfg_path = Path(__file__).resolve().parents[1] / 'defaults.yaml'
     if not cfg_path.exists():
         return {}
@@ -61,6 +68,7 @@ def _load_defaults_yaml() -> dict:
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
+    """Builds and caches the effective application settings."""
     # Base order: env vars + .env + code defaults
     settings = Settings()
 

@@ -5,6 +5,7 @@ import { AppButton, AppInput, EmptyState, Field, InlineMessage, ScreenScroll, Se
 import { api } from '@/lib/api';
 import { useApiConfig } from '@/lib/api-config';
 
+/** Renders client-side environment settings such as backend host selection. */
 export default function SettingsScreen() {
   const { apiBaseUrl, defaultApiBaseUrl, setApiBaseUrl, resetApiBaseUrl } = useApiConfig();
   const [draft, setDraft] = useState(apiBaseUrl);

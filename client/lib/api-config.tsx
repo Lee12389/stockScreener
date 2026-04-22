@@ -15,10 +15,12 @@ type ApiConfigContextValue = {
 
 const ApiConfigContext = createContext<ApiConfigContextValue | null>(null);
 
+/** Normalizes API base URLs by trimming whitespace and trailing slashes. */
 function normalizeBaseUrl(value: string): string {
   return value.trim().replace(/\/+$/, '');
 }
 
+/** Infers the Expo development host so physical devices can reach the laptop backend. */
 function inferDevHost(): string | null {
   const config = Constants.expoConfig as { hostUri?: string } | null;
   const hostUri = config?.hostUri;
@@ -29,6 +31,7 @@ function inferDevHost(): string | null {
   return host || null;
 }
 
+/** Resolves the default backend URL for web, simulator, and device environments. */
 export function resolveDefaultApiBaseUrl(): string {
   const envUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
   if (envUrl) {
@@ -52,6 +55,7 @@ export function resolveDefaultApiBaseUrl(): string {
   return 'http://127.0.0.1:5015';
 }
 
+/** Provides a persisted API base URL to all Expo screens. */
 export function ApiConfigProvider({ children }: PropsWithChildren) {
   const defaultApiBaseUrl = resolveDefaultApiBaseUrl();
   const [apiBaseUrl, setApiBaseUrlState] = useState(defaultApiBaseUrl);
@@ -108,6 +112,7 @@ export function ApiConfigProvider({ children }: PropsWithChildren) {
   );
 }
 
+/** Returns the active API configuration from context. */
 export function useApiConfig() {
   const value = useContext(ApiConfigContext);
   if (!value) {

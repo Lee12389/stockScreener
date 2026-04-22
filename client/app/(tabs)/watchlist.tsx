@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { useApiConfig } from '@/lib/api-config';
 import { WatchlistItem } from '@/lib/types';
 
+/** Renders watchlist management for web and native clients. */
 export default function WatchlistScreen() {
   const { apiBaseUrl, ready } = useApiConfig();
   const [items, setItems] = useState<WatchlistItem[]>([]);
@@ -24,6 +25,7 @@ export default function WatchlistScreen() {
     void load();
   }, [ready, apiBaseUrl]);
 
+  /** Loads the current watchlist from the backend. */
   async function load() {
     setBusy(true);
     setError('');
@@ -36,6 +38,7 @@ export default function WatchlistScreen() {
     }
   }
 
+  /** Adds a manually entered symbol to the watchlist. */
   async function addSymbol() {
     if (!symbol.trim()) {
       return;
@@ -61,6 +64,7 @@ export default function WatchlistScreen() {
     }
   }
 
+  /** Removes a symbol from the watchlist. */
   async function removeSymbol(value: string) {
     setBusy(true);
     setError('');
@@ -76,6 +80,7 @@ export default function WatchlistScreen() {
     }
   }
 
+  /** Toggles whether a watchlist symbol is enabled for scans. */
   async function toggleSymbol(item: WatchlistItem) {
     setBusy(true);
     setError('');
@@ -91,6 +96,7 @@ export default function WatchlistScreen() {
     }
   }
 
+  /** Seeds the watchlist with the built-in sector defaults. */
   async function seedDefaults() {
     setBusy(true);
     setError('');

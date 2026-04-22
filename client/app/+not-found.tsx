@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { palette } from '@/components/ui';
 
+/** Renders the fallback route when a screen is not found. */
 export default function NotFoundScreen() {
   return (
     <>
