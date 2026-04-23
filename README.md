@@ -1,6 +1,6 @@
 # Angel One AutoTrader
 
-Angel One AutoTrader is a local-first trading workspace built with a FastAPI backend, SQLite storage, browser-rendered web pages, and a shared Expo Router client for web, Android, and iOS.
+Angel One AutoTrader is a local-first trading workspace built with an internal FastAPI backend, SQLite storage, a public web gateway, and a shared Expo Router client for web, Android, and iOS.
 
 The project is optimized around one core rule: once the backend has fetched raw market data, heavy scanner operations should happen on the user's machine. That keeps charting, indicator expansion, preset tuning, and future feature growth fast and flexible.
 
@@ -29,7 +29,7 @@ The project is optimized around one core rule: once the backend has fetched raw 
 
 `defaults.yaml` and `.env` are git-ignored.
 
-## Backend Quick Start
+## Internal API Quick Start
 
 Windows:
 
@@ -41,6 +41,30 @@ Linux/macOS:
 
 ```bash
 bash ./scripts/run_linux.sh
+```
+
+The internal FastAPI API listens on `127.0.0.1:1516` by default.
+
+## Public Web Gateway
+
+Windows:
+
+```powershell
+./scripts/run_public_windows.ps1
+```
+
+Linux/macOS:
+
+```bash
+bash ./scripts/run_public_linux.sh
+```
+
+The gateway keeps the current web routes on port `5015`, proxies them back to the internal API on `127.0.0.1:1516`, and also serves the exported Expo web client at `/app`.
+
+For Linux server refreshes, rebuild the frontend and restart both services with:
+
+```bash
+bash ./scripts/refresh_linux_deploy.sh /opt/autoBot
 ```
 
 ## Shared Client Quick Start
@@ -69,7 +93,7 @@ npm run android
 npm run ios
 ```
 
-Set `EXPO_PUBLIC_API_BASE_URL` or change the in-app Settings screen if the client should talk to a different backend host.
+Web uses the current browser origin automatically when it is served through the public gateway. Set `EXPO_PUBLIC_API_BASE_URL` or change the in-app Settings screen when native builds should talk to a different host.
 
 ## Android Debug Build / Install
 
@@ -112,4 +136,5 @@ bash ./scripts/cleanup_linux.sh --dry-run
 - first full scanner refresh can take time depending on the universe size
 - once the dataset is fetched, the scanner math is intentionally performed on the web/mobile client
 - weekly and monthly intervals are available for longer-term stock selection
+- the recommended deployment shape is public gateway on `5015` plus internal API on `1516`
 - live trading stays opt-in; paper remains the default safe path

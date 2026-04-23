@@ -47,11 +47,11 @@ export default function SettingsScreen() {
   }
 
   return (
-    <ScreenScroll title="Settings" subtitle="Point the app at the FastAPI backend running on your laptop or dev machine.">
+    <ScreenScroll title="Settings" subtitle="Point the app at the public web gateway or a direct FastAPI API during development.">
       {message ? <InlineMessage tone="good" text={message} /> : null}
       {error ? <InlineMessage tone="danger" text={error} /> : null}
 
-      <SectionCard title="API Base URL" subtitle="Use the laptop LAN IP for physical devices on the same Wi-Fi.">
+      <SectionCard title="API Base URL" subtitle="Use the public gateway URL for deployed devices, or your laptop LAN IP for local testing.">
         <Field label="Backend URL">
           <AppInput autoCapitalize="none" autoCorrect={false} value={draft} onChangeText={setDraft} placeholder="http://192.168.1.20:5015" />
         </Field>
@@ -62,13 +62,13 @@ export default function SettingsScreen() {
 
       <SectionCard title="Default Targets" subtitle={`Current default: ${defaultApiBaseUrl}`}>
         <Text style={{ color: '#4d6770', lineHeight: 20 }}>
-          Web uses the current browser host with port 5015. Android emulators default to 10.0.2.2. Physical devices usually need your laptop&apos;s local network IP.
+          Web uses the current browser origin when it is served through the public gateway. Native development defaults talk directly to port 1516; deployed phones should use the public gateway URL instead.
         </Text>
       </SectionCard>
 
       <EmptyState
         title="Daily routine tip"
-        subtitle="Start the FastAPI backend first, then open this Expo app on web or device and verify the connection here before running scans."
+        subtitle="Start the internal API first, then the public gateway if you want same-origin web access, and verify the connection here before running scans."
       />
     </ScreenScroll>
   );

@@ -2,11 +2,12 @@
 
 ## Overview
 
-The app is a hybrid trading workspace with one backend and two presentation layers:
+The app is a hybrid trading workspace with one internal API service and multiple client surfaces:
 
-- FastAPI + SQLite backend
-- Jinja/browser web UI
+- internal FastAPI + SQLite backend on `127.0.0.1:1516`
+- public gateway on `5015` that preserves the current browser routes and serves Expo web at `/app`
 - shared Expo Router client for web, Android, and iOS
+- legacy Jinja/browser pages that still exist inside the backend for local/admin usage
 
 The central design rule is that raw market data comes from the backend, while the interactive analysis layer lives on the frontend.
 
@@ -16,8 +17,11 @@ The central design rule is that raw market data comes from the backend, while th
 flowchart LR
     Broker["Angel One SmartAPI"] --> Backend["FastAPI Services"]
     Backend --> DB["SQLite"]
-    Backend --> Web["Jinja Web UI"]
-    Backend --> Expo["Expo Router Client"]
+    Backend --> LegacyWeb["Jinja Web UI"]
+    Backend --> Gateway["Public Gateway (5015)"]
+    Gateway --> Web["Current Browser Routes"]
+    Gateway --> ExpoWeb["Expo Web Client (/app)"]
+    Backend --> Expo["Expo Native Client"]
     Web --> BrowserEngine["scanner.js / browser charts"]
     Expo --> NativeEngine["scanner-engine.ts / native charts"]
 ```
@@ -36,6 +40,8 @@ flowchart TD
     Main --> Tournament["StrategyTournamentService"]
     Main --> Options["OptionsStrategyService"]
     Main --> Watchlist["WatchlistService"]
+    Gateway["app/public_gateway.py"] --> Config
+    Gateway --> Main
 ```
 
 ## Scanner Architecture
@@ -110,7 +116,7 @@ This makes the app easy to run daily on a laptop without requiring an external d
 
 ## Mobile and Web Compatibility
 
-The shared Expo app is the portable client layer. The browser web pages remain useful for richer desktop workflows, especially the scanner table. The two client surfaces share the same backend and follow the same rule:
+The shared Expo app is the portable client layer. The public deployment keeps the existing browser routes on `5015`, exposes the shared Expo web bundle at `/app`, and keeps the backend loopback-only on `1516`. Legacy Jinja pages remain useful for local admin workflows. All client surfaces follow the same rule:
 
 - fetch raw data once
 - analyze and visualize locally on the user device
@@ -119,6 +125,7 @@ The shared Expo app is the portable client layer. The browser web pages remain u
 
 - APScheduler is used for backend interval jobs such as automation, paper auto-trading, and tournaments
 - native dependency fixes for Expo are kept in `client/patches/`
+- `app/public_gateway.py` plus `autobot.service` keep the public web entrypoint stable while the API stays internal
 - the cleanup script is the supported way to prune old rows and temporary files
 
 ## Extension Points

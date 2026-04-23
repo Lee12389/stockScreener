@@ -4,6 +4,7 @@ import { createContext, PropsWithChildren, useContext, useEffect, useState } fro
 import { Platform } from 'react-native';
 
 const STORAGE_KEY = 'stockscreener.api-base-url.v1';
+const INTERNAL_DEV_API_PORT = '1516';
 
 type ApiConfigContextValue = {
   apiBaseUrl: string;
@@ -39,20 +40,24 @@ export function resolveDefaultApiBaseUrl(): string {
   }
 
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    const host = window.location.hostname || '127.0.0.1';
-    return `http://${host}:5015`;
+    const { hostname, origin, port, protocol } = window.location;
+    if (!port || port === '5015') {
+      return normalizeBaseUrl(origin || 'http://127.0.0.1:5015');
+    }
+    const host = hostname || '127.0.0.1';
+    return `${protocol}//${host}:${INTERNAL_DEV_API_PORT}`;
   }
 
   const inferredHost = inferDevHost();
   if (inferredHost && inferredHost !== 'localhost') {
-    return `http://${inferredHost}:5015`;
+    return `http://${inferredHost}:${INTERNAL_DEV_API_PORT}`;
   }
 
   if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:5015';
+    return `http://10.0.2.2:${INTERNAL_DEV_API_PORT}`;
   }
 
-  return 'http://127.0.0.1:5015';
+  return `http://127.0.0.1:${INTERNAL_DEV_API_PORT}`;
 }
 
 /** Provides a persisted API base URL to all Expo screens. */

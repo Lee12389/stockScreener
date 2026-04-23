@@ -10,7 +10,7 @@ Angel One AutoTrader is a local-first trading workspace built around three ideas
 
 The app currently supports:
 
-- browser-based web pages served by FastAPI
+- the current browser-based web UI served through the public gateway on the existing external port
 - a shared Expo client for web, Android, and iOS
 - scanner workflows across intraday, daily, weekly, and monthly timeframes
 - paper trading, watchlists, strategy scans, options planning, and bot tournaments
@@ -31,7 +31,7 @@ The app currently supports:
 
 ## Quick Start
 
-### 1. Start the backend
+### 1. Start the internal API
 
 Windows:
 
@@ -45,9 +45,25 @@ Linux/macOS:
 bash ./scripts/run_linux.sh
 ```
 
-The backend serves both JSON APIs and the built-in web pages on port `5015` by default.
+The internal FastAPI API listens on `127.0.0.1:1516` by default.
 
-### 2. Start the shared client
+### 2. Start the public web gateway when you want the deployed web surface
+
+Windows:
+
+```powershell
+./scripts/run_public_windows.ps1
+```
+
+Linux/macOS:
+
+```bash
+bash ./scripts/run_public_linux.sh
+```
+
+The gateway keeps the current web routes on `5015`, proxies requests back to the internal API on `127.0.0.1:1516`, and also exposes the exported Expo web client at `/app`.
+
+### 3. Start the shared client
 
 Windows:
 
@@ -65,7 +81,7 @@ bash ./scripts/run_client_linux.sh android
 bash ./scripts/run_client_linux.sh ios
 ```
 
-### 3. Connect the broker session
+### 4. Connect the broker session
 
 You can do this from:
 
@@ -183,7 +199,7 @@ bash ./scripts/cleanup_linux.sh --dry-run
 
 ## Web Usage
 
-The built-in web app is available directly from the FastAPI server. Main pages:
+The main deployed web app is available through the public gateway on port `5015`. Main pages:
 
 - `/` dashboard
 - `/watchlist`
@@ -200,6 +216,8 @@ Use the web version when you want:
 - large-table filtering
 - expanded browser charts
 - easier CSV copy/download for visible symbols
+
+The public gateway preserves the current web routes, so the richer browser scanner and desktop-oriented pages stay on the same URLs. The exported Expo web bundle is also available at `/app` when you want to preview the shared mobile/web client in a browser.
 
 ## Mobile Usage
 
@@ -232,14 +250,16 @@ For iOS you need one of:
 - a Mac with Xcode for local builds
 - EAS Build
 
-### Pointing the phone at your laptop
+### Pointing the phone at your laptop or deployed server
 
 If the phone app cannot reach the backend:
 
 1. keep the phone and laptop on the same network
-2. find your laptop LAN IP
+2. find your laptop LAN IP or deployed server host
 3. open the in-app Settings screen
-4. set the API base URL to `http://<your-laptop-ip>:5015`
+4. set the API base URL to `http://<your-host>:5015`
+
+Use `1516` only when you intentionally expose the internal API for local development. The normal public/mobile entrypoint should stay the gateway on `5015`.
 
 ## Scanner Presets and Common Use Cases
 
@@ -306,6 +326,7 @@ Check:
 - laptop firewall rules
 - CORS origins if you changed defaults
 - the API base URL in the Settings screen
+- whether the public gateway on `5015` is running
 - whether the phone is on the same Wi-Fi network
 
 ### Old data feels stale

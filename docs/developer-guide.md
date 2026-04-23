@@ -17,6 +17,7 @@ app/
   config.py              Runtime settings and defaults loading
   db.py                  SQLite models, session factory, schema guards
   main.py                FastAPI routes for APIs and web pages
+  public_gateway.py      Public web gateway for Expo static assets + /api proxy
   models.py              Pydantic request/response models
   services/              Broker, analysis, scanner, paper, options, tournament services
   static/                Browser scanner logic and CSS
@@ -28,10 +29,14 @@ client/
   patches/               Native dependency fixes applied through patch-package
 scripts/
   run_*                  Local launch helpers
+  run_public_*           Local public gateway launch helpers
   cleanup.py             SQLite/temp-cache cleanup utility
   install_android_*      Android debug build/install helpers
+  refresh_linux_deploy.sh
 .github/workflows/
   client-cross-platform.yml
+autobot.service          Public gateway systemd unit on port 5015
+autobot-api.service      Internal API systemd unit on port 1516
 ```
 
 ## Core Architecture
@@ -44,7 +49,14 @@ scripts/
 - watchlist and scanner configuration storage
 - strategy snapshots used by paper trading and tournaments
 - options strategy parsing and payoff packaging
-- browser-rendered web pages and JSON APIs
+- internal JSON APIs and legacy Jinja pages
+
+### Public gateway responsibilities
+
+- keeps the current public entrypoint on port `5015`
+- proxies existing web routes plus `/api/*` to the internal API on `127.0.0.1:1516`
+- serves the exported Expo web bundle from `client/dist` under `/app`
+- lets web and mobile share one public host while the FastAPI service stays loopback-only
 
 ### Frontend responsibilities
 
@@ -73,6 +85,13 @@ scripts/
 - wires the entire FastAPI app
 - exposes both JSON endpoints and web page routes
 - instantiates all services once at module import time
+
+### `app/public_gateway.py`
+
+- preserves the current browser routes on the public port
+- serves the static Expo web export under `/app`
+- proxies public API traffic to the internal FastAPI service
+- is the recommended public-facing process for server deployment
 
 ### `app/services/strategy.py`
 
@@ -190,7 +209,7 @@ Use `scripts/cleanup.py` to prune stale rows and temp files instead of manually 
 
 ## Local Development
 
-### Backend
+### Internal API
 
 ```powershell
 ./scripts/run_windows.ps1
@@ -198,6 +217,16 @@ Use `scripts/cleanup.py` to prune stale rows and temp files instead of manually 
 
 ```bash
 bash ./scripts/run_linux.sh
+```
+
+### Public gateway
+
+```powershell
+./scripts/run_public_windows.ps1
+```
+
+```bash
+bash ./scripts/run_public_linux.sh
 ```
 
 ### Expo client
@@ -224,6 +253,7 @@ Backend:
 ```powershell
 python -m compileall app
 python -c "from app.main import app; print('app-import-ok')"
+python -c "from app.public_gateway import app; print('gateway-import-ok')"
 ```
 
 Client:
@@ -243,6 +273,8 @@ npm run export:web
 - Android build regressions
 - iOS build regressions on hosted runners
 
+`scripts/refresh_linux_deploy.sh` is the repo-supported refresh path for Linux hosts that need to rebuild the Expo web frontend and restart both systemd services.
+
 ## Documentation and Commenting Standard
 
 This repo now follows a simple standard:
@@ -257,6 +289,7 @@ Generated files, vendored dependencies, and native build output should stay out 
 
 - do not move scanner-heavy work back into the backend unless there is a strong reason
 - keep mobile and web behavior aligned where possible
+- keep the internal API on loopback and expose the public web surface through the gateway when deploying
 - avoid destructive changes to user SQLite data
 - treat live trading as opt-in and paper mode as the default path
 - when changing interval handling, update both the backend aggregation logic and the client display helpers

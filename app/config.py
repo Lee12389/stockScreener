@@ -17,8 +17,12 @@ class Settings(BaseSettings):
     app_name: str = Field(default='Angel One AutoTrader', alias='APP_NAME')
     app_env: str = Field(default='dev', alias='APP_ENV')
     host: str = Field(default='127.0.0.1', alias='HOST')
-    port: int = Field(default=5015, alias='PORT')
+    port: int = Field(default=1516, alias='PORT')
+    public_host: str = Field(default='0.0.0.0', alias='PUBLIC_HOST')
+    public_port: int = Field(default=5015, alias='PUBLIC_PORT')
     secret_key: str = Field(default='change-me', alias='SECRET_KEY')
+    internal_api_base_url_override: str = Field(default='', alias='INTERNAL_API_BASE_URL')
+    web_dist_dir: str = Field(default='', alias='WEB_DIST_DIR')
 
     allow_live_trades: bool = Field(default=False, alias='ALLOW_LIVE_TRADES')
     default_mode: str = Field(default='paper', alias='DEFAULT_MODE')
@@ -47,6 +51,20 @@ class Settings(BaseSettings):
         """Returns the CORS origin allowlist as a non-empty list."""
         raw = [s.strip() for s in self.cors_origins.split(',') if s.strip()]
         return raw or ['*']
+
+    @property
+    def internal_api_base_url(self) -> str:
+        """Returns the internal loopback URL used by the public gateway proxy."""
+        if self.internal_api_base_url_override.strip():
+            return self.internal_api_base_url_override.strip().rstrip('/')
+        return f'http://127.0.0.1:{self.port}'
+
+    @property
+    def resolved_web_dist_dir(self) -> Path:
+        """Returns the Expo web export directory used by the public gateway."""
+        if self.web_dist_dir.strip():
+            return Path(self.web_dist_dir).expanduser().resolve()
+        return Path(__file__).resolve().parents[1] / 'client' / 'dist'
 
 
 def _load_defaults_yaml() -> dict:
@@ -82,7 +100,11 @@ def get_settings() -> Settings:
         ('app_env', 'APP_ENV'),
         ('host', 'HOST'),
         ('port', 'PORT'),
+        ('public_host', 'PUBLIC_HOST'),
+        ('public_port', 'PUBLIC_PORT'),
         ('secret_key', 'SECRET_KEY'),
+        ('internal_api_base_url_override', 'INTERNAL_API_BASE_URL'),
+        ('web_dist_dir', 'WEB_DIST_DIR'),
         ('allow_live_trades', 'ALLOW_LIVE_TRADES'),
         ('default_mode', 'DEFAULT_MODE'),
         ('max_order_qty', 'MAX_ORDER_QTY'),

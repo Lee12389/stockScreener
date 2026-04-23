@@ -1,6 +1,6 @@
 ﻿param(
   [string]$Host = '127.0.0.1',
-  [int]$Port = 5015
+  [int]$Port = 1516
 )
 
 if (!(Test-Path '.venv')) {

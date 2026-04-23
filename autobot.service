@@ -1,13 +1,16 @@
 ﻿[Unit]
-Description=AutoBot FastAPI Service
-After=network.target
+Description=AutoBot Public Web Gateway
+After=network.target autobot-api.service
+Requires=autobot-api.service
 
 [Service]
 User=azureuser
 Group=azureuser
 WorkingDirectory=/opt/autoBot
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/opt/autoBot/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 5015
+Environment=INTERNAL_API_BASE_URL=http://127.0.0.1:1516
+Environment=WEB_DIST_DIR=/opt/autoBot/client/dist
+ExecStart=/opt/autoBot/.venv/bin/uvicorn app.public_gateway:app --host 0.0.0.0 --port 5015
 Restart=always
 RestartSec=3
 
